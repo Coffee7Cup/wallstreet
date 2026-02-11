@@ -61,3 +61,20 @@ func (s *Store) LoadSimulationState(ctx context.Context) (*models.SimulationStat
 	logs.Log.Debug("Simulation state loaded", zap.Int("tick", state.Tick))
 	return &state, nil
 }
+
+
+func (s *Store) GetDateFromTickOfCompany(ctx context.Context, tick int, companyID int) (time.Time, error) {
+	var date time.Time
+	err := s.pool.QueryRow(
+		ctx,
+		"SELECT date FROM stock_prices_with_ticks WHERE tick_idx = $1 AND company_id = $2",
+		tick,
+		companyID,
+	).Scan(&date)
+	if err != nil {
+		logs.Log.Error("Failed to get date from tick", zap.Int("tick", tick), zap.Int("company_id", companyID), zap.Error(err))
+		return time.Time{}, fmt.Errorf("could not get date from tick: %w", err)
+	}
+	logs.Log.Debug("Date from tick", zap.Int("tick", tick), zap.Int("company_id", companyID), zap.Time("date", date))
+	return date, nil	
+}

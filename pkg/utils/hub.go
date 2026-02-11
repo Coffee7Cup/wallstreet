@@ -77,9 +77,12 @@ func (h *Hub) Run() {
 					logs.Log.Error("Hub failed to fetch prices for tick", zap.Int("tick", tick), zap.Error(err))
 				}
 
-				news, err = h.store.GetNewsAtTick(context.Background(), tick)
-				if err != nil {
-					logs.Log.Error("Hub failed to fetch news for tick", zap.Int("tick", tick), zap.Error(err))
+				for _, price := range prices {
+					news_list, err := h.store.GetNewsByDateAndCompanyId(context.Background(), price.Date, price.CompanyID)
+					if err != nil {
+						logs.Log.Error("Hub failed to fetch news for date and company id", zap.Time("date", price.Date), zap.Int("company_id", price.CompanyID), zap.Error(err))
+					}
+					news = append(news, news_list...)
 				}
 			}
 

@@ -93,11 +93,15 @@ func (h *TradeHandler) WebSocketHandler(c *websocket.Conn) {
 
 		// Fetch price at current tick to get the simulation date for this company
 		price, err := h.store.GetStockAtTickOfCompany(context.Background(), state.Tick, trade.CompanyID)
-		if err == nil {
-			trade.Date = price.Date
-		} else {
-			trade.Date = time.Now() // fallback
-		}
+		if err != nil {
+			logs.Log.Error("Failed to get stock at tick", zap.Error(err))
+			client.Send <- utils.BroadcastMessage{
+				Type:  "ERROR",
+				Error: err.Error(),
+			}
+			continue
+		} 
+		trade.Date = price.Date
 		trade.Timestamp = time.Now()
 
 		logs.Log.Info("Trade execution attempt", zap.Int("user_id", trade.UserID), zap.String("type", trade.TradeType), zap.Int("company_id", trade.CompanyID), zap.Int("quantity", trade.Quantity))

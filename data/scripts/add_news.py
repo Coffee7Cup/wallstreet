@@ -1,44 +1,77 @@
 import os
-import psycopg2
 import csv
+from pathlib import Path
+import psycopg2
+from dotenv import load_dotenv
 
-# Database configuration
-DB_CONFIG = {
-    "dbname": "wallstreet",
-    "user": "postgres",
-    "password": "yash123",
-    "host": "localhost",
-    "port": 5432,
-}
+# ----------------------------
+# Path & ENV setup
+# ----------------------------
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+load_dotenv(BASE_DIR / ".env")
 
+print(BASE_DIR)
+
+DATABASE_URL = os.getenv("DB_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DB_URL not found in .env")
+
+DATA_DIR = BASE_DIR / "data/company-data"
+
+# ----------------------------
+# Loader
+# ----------------------------
 def load_news():
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(DATABASE_URL)
     cur = conn.cursor()
 
-    # Paths to news files (assuming news.csv in each company dir or a global one)
-    # The user request mentioned "news" without specifying format. 
-    # Let's assume a central data/news.csv or per-company news.csv
-    
-    news_dirs = ["../airtel", "../infosys", "../itc", "../relience-industries", "../tcs"]
-    
-    for news_dir in news_dirs:
-        path = os.path.join(news_dir, "news.csv")
-        if not os.path.exists(path):
+    for company_dir in DATA_DIR.iterdir():
+        if not company_dir.is_dir():
             continue
-            
-        print(f"Loading news from: {path}")
-        with open(path, mode='r', encoding='utf-8') as f:
+
+        csv_path = company_dir / "news.csv"
+        if not csv_path.exists():
+            continue
+
+        company_symbol = company_dir.name.upper()
+        print(f"Loading news for: {company_symbol}")
+
+        with open(csv_path, mode="r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
+
             for row in reader:
                 cur.execute("""
-                    INSERT INTO news (release_date, title, content, news_type, impact_factor)
-                    VALUES (%s, %s, %s, %s, %s)
-                """, (row['release_date'], row['title'], row.get('content', ''), row.get('news_type', ''), row.get('impact_factor', 0)))
+                    INSERT INTO news (
+                        release_date,
+                        title,
+                        content,
+                        tick,
+                        company_id
+
+                    )
+                    SELECT
+                        TO_DATE(%s, 'MM/DD/YYYY'),
+                        %s,
+                        %s,
+                        %s,
+                        c.id
+                    FROM companies c
+                    WHERE c.symbol = %s
+                """, (
+                    row["release_date"],
+                    row["title"],
+                    row.get("content", ""),
+                    row.get("tick"),
+                    company_symbol
+                ))
+
+        print("  ✔ Done")
 
     conn.commit()
     cur.close()
     conn.close()
-    print("News insertion complete.")
+    print("\n✅ News insertion complete")
+
 
 if __name__ == "__main__":
     load_news()

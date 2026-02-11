@@ -1,42 +1,80 @@
 import os
+from pathlib import Path
 import psycopg2
+from dotenv import load_dotenv
 
-conn = psycopg2.connect(
-    dbname="wallstreet",
-    user="postgres",
-    password="yash123",
-    host="localhost",
-    port=5432,
-)
-cur = conn.cursor()
+# ----------------------------
+# Path & ENV setup
+# ----------------------------
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+load_dotenv(BASE_DIR / ".env")
 
-names = ["airtel", "infosys", "itc", "relience-industries", "tcs"]
+print(BASE_DIR)
 
-names_symbols = {
-    "airtel": "AIRTEL",
-    "infosys": "INFOSYS",
-    "itc": "ITC",
-    "relience-industries": "RELIANCE",
-    "tcs": "TCS",
-}
+DATABASE_URL = os.getenv("DB_URL")
+if not DATABASE_URL:
+    raise RuntimeError("DB_URL not found in .env")
 
-for name in names:
-    path = f"../{name}/prices.csv"
+DATA_DIR = BASE_DIR / "data/company-data"
+# ----------------------------
+# Loader
+# ----------------------------
+def load_prices():
+    conn = psycopg2.connect(DATABASE_URL)
+    cur = conn.cursor()
 
-    if not os.path.exists(path):
-        continue
-
-    with open(path) as f:
-        cur.copy_expert(
-            "COPY prices_temp(date, open_price, close_price, low_price, high_price, no_of_shares, no_of_trades, total_turnover) FROM STDIN HEADER CSV",
-            f,
+    # Ensure temp table exists
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS prices_temp (
+            date DATE,
+            open_price NUMERIC,
+            close_price NUMERIC,
+            low_price NUMERIC,
+            high_price NUMERIC,
+            no_of_shares BIGINT,
+            no_of_trades INT,
+            total_turnover NUMERIC
         )
+    """)
 
-        print("in the function")
+    for company_dir in DATA_DIR.iterdir():
+        if not company_dir.is_dir():
+            continue
 
-        cur.execute(
-            """
-            INSERT INTO stock_prices (company_id, date,open_price, close_price, low_price, high_price, no_of_shares, no_of_trades, total_turnover)
+        csv_path = company_dir / "prices.csv"
+        if not csv_path.exists():
+            continue
+
+        company_symbol = company_dir.name.upper()
+        print(f"Loading prices for: {company_symbol}")
+
+        with open(csv_path, "r") as f:
+            cur.copy_expert("""
+                COPY prices_temp(
+                    date,
+                    open_price,
+                    close_price,
+                    low_price,
+                    high_price,
+                    no_of_shares,
+                    no_of_trades,
+                    total_turnover
+                )
+                FROM STDIN WITH CSV HEADER
+            """, f)
+
+        cur.execute("""
+            INSERT INTO stock_prices (
+                company_id,
+                date,
+                open_price,
+                close_price,
+                high_price,
+                low_price,
+                no_of_shares,
+                no_of_trades,
+                total_turnover
+            )
             SELECT
                 c.id,
                 p.date,
@@ -49,14 +87,26 @@ for name in names:
                 p.total_turnover
             FROM prices_temp p
             JOIN companies c
-            ON c.symbol = %s
-        """,
-            (names_symbols[name],),
-        )
-        cur.execute("TRUNCATE TABLE prices_temp")
+              ON c.symbol = %s
+            ON CONFLICT (company_id, date)
+            DO UPDATE SET
+                open_price = EXCLUDED.open_price,
+                close_price = EXCLUDED.close_price,
+                high_price = EXCLUDED.high_price,
+                low_price = EXCLUDED.low_price,
+                no_of_shares = EXCLUDED.no_of_shares,
+                no_of_trades = EXCLUDED.no_of_trades,
+                total_turnover = EXCLUDED.total_turnover
+        """, (company_symbol,))
 
-        print("function complete")
+        cur.execute("TRUNCATE prices_temp")
+        print("  ✔ Done")
 
-conn.commit()
-cur.close()
-conn.close()
+    conn.commit()
+    cur.close()
+    conn.close()
+    print("\n✅ Prices insertion complete")
+
+
+if __name__ == "__main__":
+    load_prices()

@@ -178,6 +178,58 @@ func (s *Store) GetStockAtTickOfCompany(ctx context.Context, tick int, companyID
 	return stock, nil
 }
 
+func (s *Store) GetStocksTillTickOfCompany(ctx context.Context, tick int, companyID int) ([]models.StockPrice, error) {
+	rows, err := s.pool.Query(ctx, "SELECT id, company_id, date, open_price, close_price, high_price, low_price, no_of_shares, no_of_trades, total_turnover FROM stock_prices_with_ticks WHERE tick_idx <= $1 AND company_id = $2 ORDER BY tick_idx ASC", tick, companyID)
+	if err != nil {
+		logs.Log.Error("Failed to query stocks till tick for company", zap.Int("tick", tick), zap.Int("company_id", companyID), zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stocks []models.StockPrice
+	for rows.Next() {
+		var stock models.StockPrice
+		if err := rows.Scan(&stock.ID, &stock.CompanyID, &stock.Date, &stock.OpenPrice, &stock.ClosePrice, &stock.HighPrice, &stock.LowPrice, &stock.NoOfShares, &stock.NoOfTrades, &stock.TotalTurnover); err != nil {
+			logs.Log.Error("Failed to scan stock till tick row", zap.Int("tick", tick), zap.Int("company_id", companyID), zap.Error(err))
+			return nil, err
+		}
+		stocks = append(stocks, stock)
+	}
+
+	if rows.Err() != nil {
+		logs.Log.Error("Rows error in GetStocksTillTickOfCompany", zap.Error(rows.Err()))
+		return nil, rows.Err()
+	}
+
+	return stocks, nil
+}
+
+func (s *Store) GetStocksTillTick(ctx context.Context, tick int) ([]models.StockPrice, error) {
+	rows, err := s.pool.Query(ctx, "SELECT id, company_id, date, open_price, close_price, high_price, low_price, no_of_shares, no_of_trades, total_turnover FROM stock_prices_with_ticks WHERE tick_idx <= $1 ORDER BY tick_idx ASC", tick)
+	if err != nil {
+		logs.Log.Error("Failed to query stocks till tick for company", zap.Int("tick", tick), zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
+
+	var stocks []models.StockPrice
+	for rows.Next() {
+		var stock models.StockPrice
+		if err := rows.Scan(&stock.ID, &stock.CompanyID, &stock.Date, &stock.OpenPrice, &stock.ClosePrice, &stock.HighPrice, &stock.LowPrice, &stock.NoOfShares, &stock.NoOfTrades, &stock.TotalTurnover); err != nil {
+			logs.Log.Error("Failed to scan stock till tick row", zap.Int("tick", tick), zap.Error(err))
+			return nil, err
+		}
+		stocks = append(stocks, stock)
+	}
+
+	if rows.Err() != nil {
+		logs.Log.Error("Rows error in GetStocksTillTickOfCompany", zap.Error(rows.Err()))
+		return nil, rows.Err()
+	}
+
+	return stocks, nil
+}
+
 func (s *Store) GetAllCompanies(ctx context.Context) ([]models.Company, error) {
 	rows, err := s.pool.Query(ctx, "SELECT id, symbol, name, sector, total_shares FROM companies")
 	if err != nil {
@@ -196,4 +248,14 @@ func (s *Store) GetAllCompanies(ctx context.Context) ([]models.Company, error) {
 		companies = append(companies, c)
 	}
 	return companies, nil
+}
+
+func (s *Store) GetCompanyByID(ctx context.Context, id int) (models.Company, error) {
+	var c models.Company
+	err := s.pool.QueryRow(ctx, "SELECT id, symbol, name, sector, total_shares FROM companies WHERE id = $1", id).Scan(&c.ID, &c.Symbol, &c.Name, &c.Sector, &c.TotalShares)
+	if err != nil {
+		logs.Log.Error("Failed to get company by ID", zap.Int("id", id), zap.Error(err))
+		return c, err
+	}
+	return c, nil
 }

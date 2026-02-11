@@ -102,9 +102,8 @@ CREATE TABLE IF NOT EXISTS news (
     release_date DATE NOT NULL,
     title VARCHAR(255) NOT NULL,
     content TEXT,
-    news_type VARCHAR(50),
-    impact_factor NUMERIC(5, 2),
-    tick INT -- Manual tick override
+    tick INT, -- Manual tick override
+    company_id INT NOT NULL REFERENCES companies(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_news_date ON news(release_date);
@@ -124,6 +123,7 @@ CREATE TABLE IF NOT EXISTS simulation_state (
 CREATE OR REPLACE VIEW prices AS SELECT * FROM stock_prices;
 CREATE OR REPLACE VIEW trade AS SELECT * FROM trades;
 CREATE OR REPLACE VIEW portfolio AS SELECT * FROM portfolio_entries;
+
 CREATE OR REPLACE VIEW stock_prices_with_ticks AS
 SELECT *, ROW_NUMBER() OVER (PARTITION BY company_id ORDER BY date) - 1 as tick_idx
 FROM stock_prices;

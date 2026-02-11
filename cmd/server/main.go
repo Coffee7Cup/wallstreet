@@ -60,14 +60,18 @@ func main() {
 		logs.Log.Fatal("Failed to connect to database", zap.Error(err))
 	}
 	defer store.Close()
-
+	
 	engine := simulation.NewEngine(store)
 	hub := utils.NewHub(engine.Subscribe(), store, engine)
+
+	// Start engine immediately for development convenience
+	engine.Start(0)
+
 	go engine.Run(context.Background())
 	go hub.Run()
 
 	userGroup := app.Group("/api/v1/users")
-	routers.UserRouter(userGroup, controllers.NewUserHandler(store))
+	routers.UserRouter(userGroup, controllers.NewUserHandler(store, engine))
 
 	adminGroup := app.Group("/api/v1/admin")
 	routers.AdminRouter(adminGroup, controllers.NewAdminHandler(store, engine, hub))

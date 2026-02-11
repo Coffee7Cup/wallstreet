@@ -69,7 +69,15 @@ WebSockets provide full-duplex communication between the server and the frontend
 ### Admin Dashboard
 Admins can monitor the system in real-time:
 - **Monitor Dashboard**: Accessible at `/api/v1/admin/monitor` (shows CPU, RAM, and request stats).
-- **System Stats**: `/api/v1/admin/stats` returns JSON data including active WebSocket connections.
+- **WebSocket Monitor**: `/api/v1/admin/monitor/ws` streams real-time system and simulation metrics.
+- **Engine Logs**: `/api/v1/admin/stats/logs` returns the latest engine log entries.
+
+## Logging
+
+The system uses a structured logging approach with Uber's `zap` library.
+- **Engine Logs**: Written to `./logs/engine.log` in JSON format.
+- **Level-Based Filtering**: Console output is filtered to show only critical errors and engine-specific warnings, while the log file captures all informative events.
+- **Structured Info**: Logs include timestamps, levels, categories, and contextual data (e.g., tick number, error details), allowing for structured parsing and better visibility in the admin panel.
 
 ### Health Check
 - **Endpoint**: `/health` (returns `{"status": "ok"}`).

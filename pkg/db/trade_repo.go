@@ -93,6 +93,7 @@ func (s *Store) SellStocks(ctx context.Context, trade models.Trade) error {
 	return nil
 }
 
+//i guess ii must take date from the engine state ***
 func (s *Store) BuyStocks(ctx context.Context, trade models.Trade) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {

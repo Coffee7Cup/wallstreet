@@ -3,6 +3,7 @@ package controllers
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/coffee7cup/wallstreet/pkg/db"
@@ -161,13 +162,15 @@ func (h *AdminHandler) MonitorWS(c *fiber.Ctx) error {
 			cUsage, _ := cpu.Percent(0, false)
 			mUsage, _ := mem.VirtualMemory()
 
+			state := h.engine.GetState()
 			stats := fiber.Map{
 				"cpu_usage":          fmt.Sprintf("%.2f%%", cUsage[0]),
-				"ram_usage":          fmt.Sprintf("%.2f GB / %.2f GB", float64(mUsage.Used)/1e9, float64(mUsage.Total)/1e9),
+				"ram_usage":          fmt.Sprintf("%.2f GB", float64(mUsage.Used)/1e9),
 				"active_connections": h.hub.GetConnectionCount(),
 				"active_requests":    middleware.GetActiveRequests(),
-				"simulation_tick":    h.engine.GetState().Tick,
-				"is_active":          h.engine.GetState(),
+				"simulation_tick":    state.Tick,
+				"is_active":          state.IsActive,
+				"is_paused":          state.IsPaused,
 				"ts":                 time.Now().Format(time.RFC3339),
 			}
 
@@ -176,4 +179,48 @@ func (h *AdminHandler) MonitorWS(c *fiber.Ctx) error {
 			}
 		}
 	})(c)
+}
+
+func (h *AdminHandler) GetTradesByUserID(c *fiber.Ctx) error {
+	user_id := c.Params("user_id")
+	trades, err := h.store.GetTradesByUserID(c.Context(), user_id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not get trades"})
+	}
+	return c.JSON(trades)
+}
+
+func (h *AdminHandler) GetTradesBySymbol(c *fiber.Ctx) error {
+	user_id := c.Params("user_id")
+	symbol := c.Params("symbol")
+	trades, err := h.store.GetTradesBySymbol(c.Context(), user_id, symbol)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not get trades"})
+	}
+	return c.JSON(trades)
+}
+
+func (h *AdminHandler) GetTradesBySymbolAndLimit(c *fiber.Ctx) error {
+	user_id := c.Params("user_id")
+	symbol := c.Params("symbol")
+	limit := c.Params("limit")
+
+	limitInt, err := strconv.Atoi(limit)
+
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not get trades, string parsing failed"})
+	}
+
+	trades, err := h.store.GetTradesBySymbolAndLimit(c.Context(), user_id, symbol, limitInt)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not get trades"})
+	}
+	return c.JSON(trades)
+}
+
+func (h *AdminHandler) ResetSimulation(c *fiber.Ctx) error {
+	if err := h.store.ResetSimulation(c.Context()); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not reset simulation"})
+	}
+	return c.JSON(fiber.Map{"message": "simulation reset"})
 }

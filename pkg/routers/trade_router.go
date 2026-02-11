@@ -19,4 +19,5 @@ func VerifyWebSocketUpgrade(ctx *fiber.Ctx) error {
 func TradeRouter(router fiber.Router, handler *controllers.TradeHandler) {
 	logs.Log.Info("Initializing Trade Router (WebSocket)")
 	router.Get("/ws", middleware.JWTMiddleware(), VerifyWebSocketUpgrade, websocket.New(handler.WebSocketHandler))
+
 }

@@ -23,8 +23,8 @@ def load_users_admins():
 
     # Path handling to ensure script works from any location
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    user_data_path = os.path.join(base_dir, "..", "dummy-data", "user_data.csv")
-    admin_data_path = os.path.join(base_dir, "..", "dummy-data", "admin_data.csv")
+    user_data_path = os.path.join(base_dir, "..", "users-admins", "user_data.csv")
+    admin_data_path = os.path.join(base_dir, "..", "users-admins", "admin_data.csv")
 
     with open(user_data_path, "r") as f:
         reader = csv.reader(f)

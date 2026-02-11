@@ -25,4 +25,12 @@ func AdminRouter(router fiber.Router, handler *controllers.AdminHandler) {
 	statsGroup := router.Group("/stats", middleware.JWTMiddleware(), middleware.VerifyAdmin())
 	statsGroup.Get("/", handler.GetStats)
 	statsGroup.Get("/logs", handler.GetLogs)
+
+	tradeGroup := router.Group("/trade", middleware.JWTMiddleware(), middleware.VerifyAdmin())
+	tradeGroup.Get("/trades/:user_id", handler.GetTradesByUserID)
+	tradeGroup.Get("/trades/:user_id/:symbol", handler.GetTradesBySymbol)
+	tradeGroup.Get("/trades/:user_id/:symbol/:limit", handler.GetTradesBySymbolAndLimit)
+
+	simulationGroup := router.Group("/simulation", middleware.JWTMiddleware(), middleware.VerifyAdmin())
+	simulationGroup.Post("/reset", handler.ResetSimulation)
 }
