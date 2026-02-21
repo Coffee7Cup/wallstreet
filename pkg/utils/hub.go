@@ -8,6 +8,7 @@ import (
 	"github.com/coffee7cup/wallstreet/pkg/models"
 	"github.com/coffee7cup/wallstreet/pkg/simulation"
 	"github.com/gofiber/contrib/websocket"
+	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 )
 
@@ -46,10 +47,13 @@ func NewHub(tick <-chan models.SimulationBroadcast, store *db.Store, engine *sim
 	}
 }
 
-func (h *Hub) Run() {
+func (h *Hub) Run(ctx context.Context) {
 	logs.Log.Info("WebSocket Hub running")
 	for {
 		select {
+		case <-ctx.Done():
+			logs.Log.Info("WebSocket Hub stopping via context")
+			return
 
 		case c := <-h.Join:
 			h.clients[c] = true
@@ -72,22 +76,38 @@ func (h *Hub) Run() {
 			var err error
 
 			if msg.IsActive {
-				prices, err = h.store.GetStocksAtTick(context.Background(), tick)
+				prices, err = h.store.GetStocksAtTick(ctx, tick)
 				if err != nil {
 					logs.Log.Error("Hub failed to fetch prices for tick", zap.Int("tick", tick), zap.Error(err))
+					if err == pgx.ErrNoRows {
+						logs.Log.Warn("No prices found for tick, stopping simulation", zap.Int("tick", tick))
+						h.engine.Stop()
+
+						broadcastMsg := BroadcastMessage{
+							Type:     "SIMULATION_ENDED",
+							Tick:     tick,
+							IsActive: false,
+							IsPaused: false,
+							Error:    "Simulation reached the end of available data",
+						}
+						h.broadcastToAll(broadcastMsg)
+						continue // Skip normal update
+					}
 				}
 
-				for _, price := range prices {
-					news_list, err := h.store.GetNewsByDateAndCompanyId(context.Background(), price.Date, price.CompanyID)
-					if err != nil {
-						logs.Log.Error("Hub failed to fetch news for date and company id", zap.Time("date", price.Date), zap.Int("company_id", price.CompanyID), zap.Error(err))
-					}
-					news = append(news, news_list...)
+				news, err = h.store.GetNewsAtTickForAll(ctx, tick)
+				if err != nil {
+					logs.Log.Error("Hub failed to fetch news for tick", zap.Int("tick", tick), zap.Error(err))
 				}
 			}
 
+			msgType := "UPDATE"
+			if !msg.IsActive {
+				msgType = "SIMULATION_ENDED"
+			}
+
 			broadcastMsg := BroadcastMessage{
-				Type:     "UPDATE",
+				Type:     msgType,
 				Tick:     tick,
 				Stocks:   prices,
 				News:     news,
@@ -95,18 +115,22 @@ func (h *Hub) Run() {
 				IsPaused: msg.IsPaused,
 			}
 
-			count := 0
-			for client := range h.clients {
-				select {
-				case client.Send <- broadcastMsg:
-					count++
-				default:
-					logs.Log.Debug("Skipped broadcast for slow client")
-				}
-			}
-			logs.Log.Info("Broadcasted update to clients", zap.Int("tick", tick), zap.Int("clients_notified", count))
+			h.broadcastToAll(broadcastMsg)
 		}
 	}
+}
+
+func (h *Hub) broadcastToAll(msg BroadcastMessage) {
+	count := 0
+	for client := range h.clients {
+		select {
+		case client.Send <- msg:
+			count++
+		default:
+			logs.Log.Debug("Skipped broadcast for slow client")
+		}
+	}
+	// logs.Log.Info("Broadcasted message to clients", zap.String("type", msg.Type), zap.Int("tick", msg.Tick), zap.Int("clients_notified", count))
 }
 
 func (c *Client) WritePump() {

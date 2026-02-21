@@ -16,8 +16,13 @@ func VerifyWebSocketUpgrade(ctx *fiber.Ctx) error {
 	return fiber.ErrUpgradeRequired
 }
 
-func TradeRouter(router fiber.Router, handler *controllers.TradeHandler) {
-	logs.Log.Info("Initializing Trade Router (WebSocket)")
-	router.Get("/ws", middleware.JWTMiddleware(), VerifyWebSocketUpgrade, websocket.New(handler.WebSocketHandler))
+func TradeRouter(router fiber.Router, tradeHandler *controllers.TradeHandler) {
+	logs.Log.Info("Initializing Trade Router")
 
+	// Portfolio & Private Trade Routes
+	router.Get("/portfolio", middleware.JWTMiddleware(), tradeHandler.GetUserPortfolio)
+	router.Get("/trades", middleware.JWTMiddleware(), tradeHandler.GetUserTradesLimit)
+
+	// WebSocket Route
+	router.Get("/ws", middleware.JWTMiddleware(), VerifyWebSocketUpgrade, websocket.New(tradeHandler.WebSocketHandler))
 }

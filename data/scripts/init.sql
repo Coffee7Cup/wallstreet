@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS trades (
 );
 
 CREATE INDEX IF NOT EXISTS idx_trades_user_id ON trades(user_id);
+CREATE INDEX IF NOT EXISTS idx_trades_timestamp ON trades(timestamp DESC);
 
 -- 8. Portfolio Entries table
 CREATE TABLE IF NOT EXISTS portfolio_entries (
@@ -102,7 +103,6 @@ CREATE TABLE IF NOT EXISTS news (
     release_date DATE NOT NULL,
     title VARCHAR(255) NOT NULL,
     content TEXT,
-    tick INT, -- Manual tick override
     company_id INT NOT NULL REFERENCES companies(id)
 );
 

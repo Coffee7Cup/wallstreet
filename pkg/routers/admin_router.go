@@ -25,6 +25,7 @@ func AdminRouter(router fiber.Router, handler *controllers.AdminHandler) {
 	statsGroup := router.Group("/stats", middleware.JWTMiddleware(), middleware.VerifyAdmin())
 	statsGroup.Get("/", handler.GetStats)
 	statsGroup.Get("/logs", handler.GetLogs)
+	statsGroup.Get("/top-traders", handler.GetTopTraders)
 
 	tradeGroup := router.Group("/trade", middleware.JWTMiddleware(), middleware.VerifyAdmin())
 	tradeGroup.Get("/trades/:user_id", handler.GetTradesByUserID)

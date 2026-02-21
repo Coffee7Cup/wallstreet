@@ -49,14 +49,6 @@ func (s *Store) RunInitSQL(ctx context.Context) error {
 	CREATE OR REPLACE VIEW stock_prices_with_ticks AS
 	SELECT *, ROW_NUMBER() OVER (PARTITION BY company_id ORDER BY date) - 1 as tick_idx
 	FROM stock_prices;
-
-	CREATE OR REPLACE VIEW news_with_ticks AS
-	WITH sim_start AS (
-		SELECT COALESCE(MIN(date), CURRENT_DATE) as start_date FROM stock_prices
-	)
-	SELECT n.*, 
-		   COALESCE(n.tick, (n.release_date - s.start_date)) as tick_idx
-	FROM news n, sim_start s;
 	`
 
 	_, err := s.pool.Exec(ctx, initSQL)

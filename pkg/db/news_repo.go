@@ -2,7 +2,7 @@ package db
 
 import (
 	"context"
-
+	"fmt"
 	"time"
 
 	"github.com/coffee7cup/wallstreet/pkg/logs"
@@ -11,7 +11,7 @@ import (
 )
 
 func (s *Store) GetNewsByDay(ctx context.Context, date time.Time) ([]models.News, error) {
-	rows, err := s.pool.Query(ctx, "SELECT * FROM news WHERE release_date = $1", date)
+	rows, err := s.pool.Query(ctx, "SELECT id, release_date, title, content, company_id, company_name, company_symbol FROM news WHERE release_date = $1", date)
 	if err != nil {
 		logs.Log.Error("Failed to query news", zap.Time("date", date), zap.Error(err))
 		return nil, err
@@ -26,8 +26,9 @@ func (s *Store) GetNewsByDay(ctx context.Context, date time.Time) ([]models.News
 			&n.ReleaseDate,
 			&n.Title,
 			&n.Content,
-			&n.Tick,
 			&n.CompanyId,
+			&n.CompanyName,
+			&n.CompanySymbol,
 		)
 		if err != nil {
 			logs.Log.Error("Failed to scan news row", zap.Time("date", date), zap.Error(err))
@@ -39,7 +40,7 @@ func (s *Store) GetNewsByDay(ctx context.Context, date time.Time) ([]models.News
 }
 
 func (s *Store) GetNewsByDateAndCompanyId(ctx context.Context, date time.Time, companyId int) ([]models.News, error) {
-	rows, err := s.pool.Query(ctx, "SELECT * FROM news WHERE release_date = $1 AND company_id = $2", date, companyId)
+	rows, err := s.pool.Query(ctx, "SELECT id, release_date, title, content, company_id, company_name, company_symbol FROM news WHERE release_date = $1 AND company_id = $2", date, companyId)
 	if err != nil {
 		logs.Log.Error("Failed to query news", zap.Time("date", date), zap.Int("company_id", companyId), zap.Error(err))
 		return nil, err
@@ -54,8 +55,9 @@ func (s *Store) GetNewsByDateAndCompanyId(ctx context.Context, date time.Time, c
 			&n.ReleaseDate,
 			&n.Title,
 			&n.Content,
-			&n.Tick,
 			&n.CompanyId,
+			&n.CompanyName,
+			&n.CompanySymbol,
 		)
 		if err != nil {
 			logs.Log.Error("Failed to scan news row", zap.Time("date", date), zap.Int("company_id", companyId), zap.Error(err))
@@ -67,7 +69,7 @@ func (s *Store) GetNewsByDateAndCompanyId(ctx context.Context, date time.Time, c
 }
 
 func (s *Store) GetNewsTillDateByCompanyId(ctx context.Context, date time.Time, companyId int) ([]models.News, error) {
-	rows, err := s.pool.Query(ctx, "SELECT * FROM news WHERE release_date <= $1 AND company_id = $2", date, companyId)
+	rows, err := s.pool.Query(ctx, "SELECT id, release_date, title, content, company_id, company_name, company_symbol FROM news WHERE release_date <= $1 AND company_id = $2", date, companyId)
 	if err != nil {
 		logs.Log.Error("Failed to query news", zap.Time("date", date), zap.Int("company_id", companyId), zap.Error(err))
 		return nil, err
@@ -82,8 +84,9 @@ func (s *Store) GetNewsTillDateByCompanyId(ctx context.Context, date time.Time, 
 			&n.ReleaseDate,
 			&n.Title,
 			&n.Content,
-			&n.Tick,
 			&n.CompanyId,
+			&n.CompanyName,
+			&n.CompanySymbol,
 		)
 		if err != nil {
 			logs.Log.Error("Failed to scan news row", zap.Time("date", date), zap.Int("company_id", companyId), zap.Error(err))
@@ -94,10 +97,26 @@ func (s *Store) GetNewsTillDateByCompanyId(ctx context.Context, date time.Time, 
 	return newsList, nil
 }
 
-func (s *Store) GetNewsAtTick(ctx context.Context, tick int) ([]models.News, error) {
-	rows, err := s.pool.Query(ctx, "SELECT id, release_date, title, content, tick_idx, company_id FROM news_with_ticks WHERE tick_idx = $1", tick)
+func (s *Store) GetNewsSearchLimitOffsetByCompany(ctx context.Context, companyID int, date time.Time, limit int, offset int, query string) ([]models.News, error) {
+	sql := `
+		SELECT n.id, n.release_date, n.title, n.content, n.company_id, n.company_name, n.company_symbol FROM news n
+		WHERE n.company_id = $1 AND n.release_date <= $2
+	`
+	args := []interface{}{companyID, date}
+	argIdx := 3
+
+	if query != "" {
+		sql += fmt.Sprintf(" AND (n.title ILIKE $%d OR n.content ILIKE $%d)", argIdx, argIdx)
+		args = append(args, "%"+query+"%")
+		argIdx++
+	}
+
+	sql += fmt.Sprintf(" ORDER BY n.release_date DESC LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
+	args = append(args, limit, offset)
+
+	rows, err := s.pool.Query(ctx, sql, args...)
 	if err != nil {
-		logs.Log.Error("Failed to query news at tick", zap.Int("tick", tick), zap.Error(err))
+		logs.Log.Error("Failed to query news with search/limit", zap.Int("company_id", companyID), zap.Time("date", date), zap.String("query", query), zap.Error(err))
 		return nil, err
 	}
 	defer rows.Close()
@@ -105,16 +124,9 @@ func (s *Store) GetNewsAtTick(ctx context.Context, tick int) ([]models.News, err
 	var newsList []models.News
 	for rows.Next() {
 		var n models.News
-		err := rows.Scan(
-			&n.ID,
-			&n.ReleaseDate,
-			&n.Title,
-			&n.Content,
-			&n.Tick,
-			&n.CompanyId,
-		)
+		err := rows.Scan(&n.ID, &n.ReleaseDate, &n.Title, &n.Content, &n.CompanyId, &n.CompanyName, &n.CompanySymbol)
 		if err != nil {
-			logs.Log.Error("Failed to scan news row at tick", zap.Int("tick", tick), zap.Error(err))
+			logs.Log.Error("Failed to scan news row with search/limit", zap.Error(err))
 			return nil, err
 		}
 		newsList = append(newsList, n)
@@ -122,11 +134,15 @@ func (s *Store) GetNewsAtTick(ctx context.Context, tick int) ([]models.News, err
 	return newsList, nil
 }
 
-
-func (s *Store) GetNewsTillTick(ctx context.Context, tick int) ([]models.News, error) {
-	rows, err := s.pool.Query(ctx, "SELECT id, release_date, title, content, tick_idx, company_id FROM news_with_ticks WHERE tick_idx <= $1", tick)
+func (s *Store) GetNewsAtTickForAll(ctx context.Context, tick int) ([]models.News, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT n.id, n.release_date, n.title, n.content, n.company_id, n.company_name, n.company_symbol
+		FROM news n
+		JOIN stock_prices_with_ticks spt ON n.company_id = spt.company_id AND n.release_date = spt.date
+		WHERE spt.tick_idx = $1
+	`, tick)
 	if err != nil {
-		logs.Log.Error("Failed to query news till tick", zap.Int("tick", tick), zap.Error(err))
+		logs.Log.Error("Failed to query news at tick for all", zap.Int("tick", tick), zap.Error(err))
 		return nil, err
 	}
 	defer rows.Close()
@@ -139,11 +155,12 @@ func (s *Store) GetNewsTillTick(ctx context.Context, tick int) ([]models.News, e
 			&n.ReleaseDate,
 			&n.Title,
 			&n.Content,
-			&n.Tick,
 			&n.CompanyId,
+			&n.CompanyName,
+			&n.CompanySymbol,
 		)
 		if err != nil {
-			logs.Log.Error("Failed to scan news row till tick", zap.Int("tick", tick), zap.Error(err))
+			logs.Log.Error("Failed to scan news row at tick", zap.Error(err))
 			return nil, err
 		}
 		newsList = append(newsList, n)

@@ -224,3 +224,12 @@ func (h *AdminHandler) ResetSimulation(c *fiber.Ctx) error {
 	}
 	return c.JSON(fiber.Map{"message": "simulation reset"})
 }
+
+func (h *AdminHandler) GetTopTraders(c *fiber.Ctx) error {
+	state := h.engine.GetState()
+	topTraders, err := h.store.GetTopTraders(c.Context(), state.Tick)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "could not get top traders"})
+	}
+	return c.JSON(topTraders)
+}

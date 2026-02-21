@@ -60,24 +60,34 @@ func main() {
 		logs.Log.Fatal("Failed to connect to database", zap.Error(err))
 	}
 	defer store.Close()
-	
+
 	engine := simulation.NewEngine(store)
 	hub := utils.NewHub(engine.Subscribe(), store, engine)
 
 	// Start engine immediately for development convenience
 	engine.Start(0)
 
-	go engine.Run(context.Background())
-	go hub.Run()
+	// Root context for background tasks
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go engine.Run(ctx)
+	go hub.Run(ctx)
 
 	userGroup := app.Group("/api/v1/users")
-	routers.UserRouter(userGroup, controllers.NewUserHandler(store, engine))
+	authHandler := controllers.NewAuthHandler(store)
+	routers.UserRouter(userGroup, authHandler)
 
 	adminGroup := app.Group("/api/v1/admin")
 	routers.AdminRouter(adminGroup, controllers.NewAdminHandler(store, engine, hub))
 
-	wsGroup := app.Group("/api/v1/trade")
-	routers.TradeRouter(wsGroup, controllers.NewTradeHandler(store, engine, hub))
+	tradeGroup := app.Group("/api/v1/trade")
+	tradeHandler := controllers.NewTradeHandler(store, engine, hub)
+	routers.TradeRouter(tradeGroup, tradeHandler)
+
+	marketGroup := app.Group("/api/v1/market")
+	marketHandler := controllers.NewMarketHandler(store, engine)
+	routers.MarketRouter(marketGroup, marketHandler)
 
 	logs.Log.Info("Server listening on :3000")
 
@@ -95,6 +105,7 @@ func main() {
 	// Wait for termination signal
 	<-stop
 	logs.Log.Info("Shutting down server...")
+	cancel() // Stop background tasks
 
 	// 1. Shutdown Fiber
 	if err := app.Shutdown(); err != nil {

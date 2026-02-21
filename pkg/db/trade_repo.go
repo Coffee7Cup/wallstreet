@@ -73,11 +73,11 @@ func (s *Store) SellStocks(ctx context.Context, trade models.Trade) error {
 	_, err = tx.Exec(
 		ctx,
 		`
-		INSERT INTO trades (user_id, company_id, trade_type, quantity, date, timestamp)
-		VALUES ($1,$2,$3,$4,$5,$6)
+		INSERT INTO trades (user_id, company_id, trade_type, quantity, price, date, timestamp)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)
 		`,
 		trade.UserID, trade.CompanyID, trade.TradeType,
-		trade.Quantity, trade.Date, trade.Timestamp,
+		trade.Quantity, actualPrice, trade.Date, trade.Timestamp,
 	)
 	if err != nil {
 		logs.Log.Error("Failed to log trade record for selling", zap.Any("trade", trade), zap.Error(err))
@@ -93,7 +93,7 @@ func (s *Store) SellStocks(ctx context.Context, trade models.Trade) error {
 	return nil
 }
 
-//i guess ii must take date from the engine state ***
+// i guess ii must take date from the engine state ***
 func (s *Store) BuyStocks(ctx context.Context, trade models.Trade) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -161,11 +161,11 @@ func (s *Store) BuyStocks(ctx context.Context, trade models.Trade) error {
 	_, err = tx.Exec(
 		ctx,
 		`
-		INSERT INTO trades (user_id, company_id, trade_type, quantity, date, timestamp)
-		VALUES ($1,$2,$3,$4,$5,$6)
+		INSERT INTO trades (user_id, company_id, trade_type, quantity, price, date, timestamp)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)
 		`,
 		trade.UserID, trade.CompanyID, trade.TradeType,
-		trade.Quantity, trade.Date, trade.Timestamp,
+		trade.Quantity, actualPrice, trade.Date, trade.Timestamp,
 	)
 	if err != nil {
 		logs.Log.Error("Failed to log trade record for buying", zap.Any("trade", trade), zap.Error(err))
@@ -179,4 +179,92 @@ func (s *Store) BuyStocks(ctx context.Context, trade models.Trade) error {
 	}
 	logs.Log.Info("Successfully bought stocks", zap.Int("user_id", trade.UserID), zap.Int("company_id", trade.CompanyID), zap.Int("quantity", trade.Quantity))
 	return nil
+}
+
+func (s *Store) GetUserTradesLimit(ctx context.Context, userID int, limit int) ([]models.Trade, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT t.id, t.user_id, t.company_id, c.name, c.symbol, t.trade_type, t.quantity, t.price, t.date, t.timestamp 
+		FROM trades t
+		JOIN companies c ON t.company_id = c.id
+		WHERE t.user_id = $1 
+		ORDER BY t.timestamp DESC 
+		LIMIT $2
+	`, userID, limit)
+	if err != nil {
+		logs.Log.Error("Failed to fetch user trades", zap.Int("user_id", userID), zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
+
+	var trades []models.Trade
+	for rows.Next() {
+		var trade models.Trade
+		if err := rows.Scan(&trade.ID, &trade.UserID, &trade.CompanyID, &trade.CompanyName, &trade.CompanySymbol, &trade.TradeType, &trade.Quantity, &trade.Price, &trade.Date, &trade.Timestamp); err != nil {
+			logs.Log.Error("Failed to scan trade", zap.Error(err))
+			return nil, err
+		}
+		trades = append(trades, trade)
+	}
+
+	return trades, nil
+}
+
+func (s *Store) GetUserTradesSearchLimit(ctx context.Context, userID int, limit int, offset int, query string) ([]models.Trade, error) {
+	sql := `
+		SELECT t.id, t.user_id, t.company_id, c.name, c.symbol, t.trade_type, t.quantity, t.price, t.date, t.timestamp 
+		FROM trades t
+		JOIN companies c ON t.company_id = c.id
+		WHERE t.user_id = $1
+	`
+	args := []interface{}{userID}
+	argIdx := 2
+
+	if query != "" {
+		sql += fmt.Sprintf(" AND (c.symbol ILIKE $%d OR c.name ILIKE $%d OR t.trade_type ILIKE $%d)", argIdx, argIdx, argIdx)
+		args = append(args, "%"+query+"%")
+		argIdx++
+	}
+
+	sql += fmt.Sprintf(" ORDER BY t.timestamp DESC LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
+	args = append(args, limit, offset)
+
+	rows, err := s.pool.Query(ctx, sql, args...)
+	if err != nil {
+		logs.Log.Error("Failed to fetch user trades with search/limit", zap.Int("user_id", userID), zap.String("query", query), zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
+
+	var trades []models.Trade
+	for rows.Next() {
+		var trade models.Trade
+		if err := rows.Scan(&trade.ID, &trade.UserID, &trade.CompanyID, &trade.CompanyName, &trade.CompanySymbol, &trade.TradeType, &trade.Quantity, &trade.Price, &trade.Date, &trade.Timestamp); err != nil {
+			logs.Log.Error("Failed to scan trade search/limit", zap.Error(err))
+			return nil, err
+		}
+		trades = append(trades, trade)
+	}
+
+	return trades, nil
+}
+
+func (s *Store) GetAllSectors(ctx context.Context) ([]string, error) {
+	sectors, err := s.pool.Query(ctx ,"SELECT DISTINCT sector FROM companies")
+	if err != nil {
+		logs.Log.Error("Failed to fetch all sectors", zap.Error(err))
+		return nil, err
+	}
+	defer sectors.Close()
+
+	var sectorsList []string
+	for sectors.Next() {
+		var sector string
+		if err := sectors.Scan(&sector); err != nil {
+			logs.Log.Error("Failed to scan sector", zap.Error(err))
+			return nil, err
+		}
+		sectorsList = append(sectorsList, sector)
+	}
+
+	return sectorsList, nil
 }

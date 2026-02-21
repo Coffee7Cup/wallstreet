@@ -50,7 +50,7 @@ def load_fundamentals():
             continue
 
         company_symbol = company_dir.name.upper()
-        print(f"Loading news for: {company_symbol}")
+        print(f"Loading fundamentals for: {company_symbol}")
         with open(csv_path, "r") as f:
             cur.copy_expert("""
                 COPY fundamentals_temp(

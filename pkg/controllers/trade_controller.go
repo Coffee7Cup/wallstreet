@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/coffee7cup/wallstreet/pkg/db"
@@ -11,6 +12,7 @@ import (
 	"github.com/coffee7cup/wallstreet/pkg/simulation"
 	"github.com/coffee7cup/wallstreet/pkg/utils"
 	"github.com/gofiber/contrib/websocket"
+	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
 )
 
@@ -39,6 +41,55 @@ type TradeRequest struct {
 	Quantity  int    `json:"quantity"`
 }
 
+// GetUserPortfolio fetches the stock portfolio of the authenticated user.
+func (h *TradeHandler) GetUserPortfolio(c *fiber.Ctx) error {
+	id, ok := c.Locals("user_id").(int)
+	if !ok {
+		logs.Log.Warn("Portfolio fetch failed: unauthorized")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized",
+		})
+	}
+
+	portfolio, err := h.store.GetUserPortfolio(c.Context(), id)
+	if err != nil {
+		logs.Log.Error("Portfolio fetch failed: internal error", zap.Int("user_id", id), zap.Error(err))
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "internal server error",
+			"err":   err.Error(),
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message":   "user portfolio fetched successfully",
+		"portfolio": portfolio,
+	})
+}
+
+// GetUserTrades fetches the trade history of the authenticated user.
+func (h *TradeHandler) GetUserTrades(c *fiber.Ctx) error {
+	id, ok := c.Locals("user_id").(int)
+	if !ok {
+		logs.Log.Warn("Trades fetch failed: unauthorized")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized",
+		})
+	}
+
+	trades, err := h.store.GetUserTrades(c.Context(), id)
+	if err != nil {
+		logs.Log.Error("Trades fetch failed: internal error", zap.Int("user_id", id), zap.Error(err))
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "internal server error",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "user trades fetched successfully",
+		"trades":  trades,
+	})
+}
+
 // WebSocketHandler handles real-time trade requests and market data broadcasts.
 func (h *TradeHandler) WebSocketHandler(c *websocket.Conn) {
 	client := &utils.Client{
@@ -48,6 +99,13 @@ func (h *TradeHandler) WebSocketHandler(c *websocket.Conn) {
 
 	h.hub.Join <- client
 	logs.Log.Info("New client joined WebSocket hub", zap.String("remote_addr", c.RemoteAddr().String()))
+
+	go client.WritePump()
+
+	defer func() {
+		h.hub.Leave <- client
+		logs.Log.Info("Client left WebSocket hub", zap.String("remote_addr", c.RemoteAddr().String()))
+	}()
 
 	// Send initial state immediately
 	state := h.engine.GetState()
@@ -61,12 +119,15 @@ func (h *TradeHandler) WebSocketHandler(c *websocket.Conn) {
 		IsPaused: state.IsPaused,
 	}
 
-	go client.WritePump()
-
-	defer func() {
-		h.hub.Leave <- client
-		logs.Log.Info("Client left WebSocket hub", zap.String("remote_addr", c.RemoteAddr().String()))
-	}()
+	if !state.IsActive {
+		client.Send <- utils.BroadcastMessage{
+			Type:  "SIMULATION_ENDED",
+			Error: "simulation complete",
+		}
+		// Give time for the message to be sent before closing
+		time.Sleep(100 * time.Millisecond)
+		return
+	}
 
 	for {
 		var tradeReq TradeRequest
@@ -76,6 +137,16 @@ func (h *TradeHandler) WebSocketHandler(c *websocket.Conn) {
 				logs.Log.Warn("WebSocket read error", zap.Error(err))
 			}
 			return // client disconnected
+		}
+
+		// Basic input validation
+		if tradeReq.Quantity <= 0 {
+			client.Send <- utils.BroadcastMessage{Type: "ERROR", Error: "quantity must be greater than zero"}
+			continue
+		}
+		if tradeReq.TradeType != "BUY" && tradeReq.TradeType != "SELL" {
+			client.Send <- utils.BroadcastMessage{Type: "ERROR", Error: "invalid trade type"}
+			continue
 		}
 
 		// validate simulation state (time only)
@@ -100,7 +171,7 @@ func (h *TradeHandler) WebSocketHandler(c *websocket.Conn) {
 				Error: err.Error(),
 			}
 			continue
-		} 
+		}
 		trade.Date = price.Date
 		trade.Timestamp = time.Now()
 
@@ -129,4 +200,31 @@ func (h *TradeHandler) WebSocketHandler(c *websocket.Conn) {
 
 		logs.Log.Info("Trade execution successful", zap.Int("user_id", trade.UserID), zap.String("type", trade.TradeType))
 	}
+}
+
+func (h *TradeHandler) GetUserTradesLimit(c *fiber.Ctx) error {
+	id, ok := c.Locals("user_id").(int)
+	if !ok {
+		logs.Log.Warn("Trades fetch failed: unauthorized")
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized",
+		})
+	}
+
+	limit, _ := strconv.Atoi(c.Query("limit", "10"))
+	offset, _ := strconv.Atoi(c.Query("offset", "0"))
+	search := c.Query("search")
+
+	trades, err := h.store.GetUserTradesSearchLimit(c.Context(), id, limit, offset, search)
+	if err != nil {
+		logs.Log.Error("Trades fetch failed: internal error", zap.Int("user_id", id), zap.Error(err))
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "internal server error",
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": "user trades fetched successfully",
+		"trades":  trades,
+	})
 }

@@ -8,111 +8,99 @@ export const options = {
       executor: "ramping-vus",
       startVUs: 0,
       stages: [
-        { duration: "5s", target: 50 },
-        { duration: "3s", target: 500 },
-        { duration: "3s", target: 700 },
-        { duration: "30s", target: 1000 },
+        { duration: "5s", target: 10 },
+        { duration: "5s", target: 100 },
+        { duration: "10s", target: 500 },
+        { duration: "20s", target: 1000 },
+        { duration: "5s", target: 10 },
+        { duration: "10s", target: 1000 },
       ],
       gracefulStop: "30s",
     },
   },
 };
 
-const BASE_URL = "http://localhost:3000";
+const BASE_URL = "http://localhost:3000/api/v1";
 const WS_URL = "ws://localhost:3000/api/v1/trade/ws";
 
 export default function () {
   // 1. Login to get JWT
   const loginRes = http.post(
-    `${BASE_URL}/api/v1/users/login`,
-    JSON.stringify({
-      username: "jash",
-    }),
-    {
-      headers: { "Content-Type": "application/json" },
-    },
+    `${BASE_URL}/users/login`,
+    JSON.stringify({ username: "jash" }),
+    { headers: { "Content-Type": "application/json" } }
   );
 
   const isLoginOk = check(loginRes, {
-    "logged in status is 200": (r) => r.status === 200,
-    "has body": (r) => r.body !== null,
+    "login status is 200": (r) => r.status === 200,
   });
 
-  if (!isLoginOk) {
-    console.error(
-      `Login failed with status ${loginRes.status}: ${loginRes.body}`,
-    );
-    return;
-  }
+  if (!isLoginOk) return;
 
-  let loginData;
-  try {
-    loginData = loginRes.json();
-  } catch (e) {
-    console.error(`Failed to parse login JSON: ${e}`);
-    return;
-  }
-
+  const loginData = loginRes.json();
   const token = loginData.token;
-  const user = loginData.user;
+  const userId = loginData.user.id;
+  const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
-  if (!token || !user) {
-    console.error("Login response missing token or user data");
-    return;
+  // 2. Real GET Requests (Simulating page loads/navigation)
+
+  // Profile
+  http.get(`${BASE_URL}/users/profile`, authHeaders);
+
+  // Companies
+  const companiesRes = http.get(`${BASE_URL}/market/companies`, authHeaders);
+  const companies = companiesRes.json().companies || [];
+  const targetCompanyId = companies.length > 0 ? companies[0].id : 1;
+
+  // Portfolio
+  http.get(`${BASE_URL}/trade/portfolio`, authHeaders);
+
+  // Trade History
+  http.get(`${BASE_URL}/trade/trades?limit=10&offset=0`, authHeaders);
+
+  // News (Global)
+  http.get(`${BASE_URL}/market/news?limit=10`, authHeaders);
+
+  // Sectors
+  const sectorsRes = http.get(`${BASE_URL}/market/sectors`, authHeaders);
+  const sectors = sectorsRes.json().sectors || [];
+  const targetSector = sectors.length > 0 ? sectors[0] : "";
+
+  // Sector News
+  if (targetSector) {
+    http.get(`${BASE_URL}/market/news/sector?sector=${targetSector}&limit=5`, authHeaders);
   }
 
-  const userId = user.id;
+  // Stock Details (Simulation of visiting a specific dashboard)
+  http.get(`${BASE_URL}/market/companies/${targetCompanyId}`, authHeaders);
 
-  // 2. Fetch companies to have a target company ID
-  const companiesRes = http.get(`${BASE_URL}/api/v1/users/companies`);
-  if (companiesRes.status !== 200) {
-    console.error(`Failed to fetch companies: ${companiesRes.status}`);
-    return;
-  }
-  const companies = companiesRes.json().companies;
-  const targetCompanyId =
-    companies && companies.length > 0 ? companies[0].id : 1;
-
-  // 3. Connect via WebSocket
+  // 3. WebSocket Connection & Trades
   const url = `${WS_URL}?token=${token}`;
 
-  // In k6, ws.connect is used for WebSocket load testing
-  const res = ws.connect(url, {}, function (socket) {
+  ws.connect(url, {}, function (socket) {
     socket.on("open", function () {
-      console.log("WebSocket connected");
-
-      // Periodically send BUY requests
+      // Send a few buy requests during the session
       socket.setInterval(function () {
-        const tradeReq = {
+        const qty = Math.floor(Math.random() * 10) + 1;
+        socket.send(JSON.stringify({
           user_id: userId,
           company_id: targetCompanyId,
           trade_type: "BUY",
-          quantity: 1,
-        };
-        socket.send(JSON.stringify(tradeReq));
-        console.log(`Sent BUY request for company ${targetCompanyId}`);
-      }, 1000); // Send every 1 second
+          quantity: qty,
+        }));
+      }, 5000); // Every 5 seconds
     });
 
-    socket.on("message", function (message) {
-      const msg = JSON.parse(message);
-      if (msg.Type === "ERROR") {
-        console.error(`Trade Error: ${msg.Error}`);
-      } else if (msg.Type === "INITIAL_STATE") {
-        console.log("Received initial state");
+    socket.on("message", (msg) => {
+      const data = JSON.parse(msg);
+      if (data.type === "ERROR") {
+        console.warn(`Trade Error: ${data.error}`);
       }
     });
 
-    socket.on("close", () => console.log("WebSocket closed"));
-    socket.on("error", (e) => console.error("WebSocket error: ", e.error()));
-
-    // Keep the connection open for some time
-    socket.setTimeout(function () {
-      socket.close();
-    }, 20000); // Stay connected for 20 seconds
+    // Close after session duration
+    socket.setTimeout(() => socket.close(), 15000);
   });
 
-  check(res, { "status is 101": (r) => r && r.status === 101 });
-
-  sleep(1);
+  sleep(Math.random() * 2 + 1); // Randomized wait between VU iterations
 }

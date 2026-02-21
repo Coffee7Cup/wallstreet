@@ -45,23 +45,23 @@ def load_news():
                         release_date,
                         title,
                         content,
-                        tick,
-                        company_id
-
+                        company_id,
+                        company_name,
+                        company_symbol
                     )
                     SELECT
                         TO_DATE(%s, 'MM/DD/YYYY'),
                         %s,
                         %s,
-                        %s,
-                        c.id
+                        c.id,
+                        c.name,
+                        c.symbol
                     FROM companies c
                     WHERE c.symbol = %s
                 """, (
                     row["release_date"],
                     row["title"],
                     row.get("content", ""),
-                    row.get("tick"),
                     company_symbol
                 ))
 

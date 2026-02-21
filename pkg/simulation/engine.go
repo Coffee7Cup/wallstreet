@@ -50,23 +50,38 @@ func NewEngine(store *db.Store) *Engine {
 
 // TODO This fucntion i snot working properly
 func (e *Engine) tick() {
-	e.mu.Lock()
-
+	e.mu.RLock()
 	prevTick := e.state.Tick
-	e.state.Tick = prevTick + 1
+	e.mu.RUnlock()
 
-	logs.Log.Info("Engine ticking", zap.Int("new_tick", e.state.Tick), zap.Int("prev_tick", prevTick))
+	nextTick := prevTick + 1
 
-	// Get current state for broadcast
+	// Check if data exists for the next tick outside the lock
+	stocks, err := e.store.GetStocksAtTick(context.Background(), nextTick)
+	if err != nil || len(stocks) == 0 {
+		logs.Log.Info("Simulation data ended or check failed, stopping engine", zap.Int("last_tick", prevTick), zap.Error(err))
+		e.Stop()
+		return
+	}
+
+	e.mu.Lock()
+	// Double check if state hasn't been modified by another call (like Stop)
+	if !e.state.IsActive || e.state.IsPaused {
+		e.mu.Unlock()
+		return
+	}
+	e.state.Tick = nextTick
 	stateCopy := *e.state
 	e.mu.Unlock()
+
+	logs.Log.Debug("Engine ticking", zap.Int("new_tick", stateCopy.Tick), zap.Int("prev_tick", prevTick))
 
 	// Persist state
 	if err := e.store.SaveSimulationState(context.Background(), stateCopy); err != nil {
 		logs.Log.Error("Failed to persist engine tick", zap.Error(err))
 	}
 
-	// 3. Broadcast Tick state
+	// Broadcast Tick state
 	broadcastMsg := models.SimulationBroadcast{
 		Tick:     stateCopy.Tick,
 		IsActive: stateCopy.IsActive,
