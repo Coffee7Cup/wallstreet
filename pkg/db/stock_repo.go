@@ -10,8 +10,8 @@ import (
 	"go.uber.org/zap"
 )
 
-func (s *Store) GetRatios(ctx context.Context, companyID int) ([]models.Ratio, error) {
-	rows, err := s.pool.Query(ctx, "SELECT id, company_id, year, roe, debt_equity, opm, intrinsic_value FROM ratios WHERE company_id = $1 ORDER BY year DESC", companyID)
+func (s *Store) GetRatios(ctx context.Context, companyID int, date time.Time) ([]models.Ratio, error) {
+	rows, err := s.pool.Query(ctx, "SELECT id, company_id, year, COALESCE(opm, 0), COALESCE(debtor_days, 0), COALESCE(inventory_days, 0), COALESCE(days_payable, 0), COALESCE(cash_conversion_cycle, 0), COALESCE(working_capital_days, 0), COALESCE(roce_percent, 0) FROM ratios WHERE company_id = $1 AND EXTRACT(YEAR FROM year) <= $2 ORDER BY year DESC", companyID, date.Year())
 	if err != nil {
 		logs.Log.Error("Failed to query ratios", zap.Int("company_id", companyID), zap.Error(err))
 		return nil, err
@@ -21,7 +21,7 @@ func (s *Store) GetRatios(ctx context.Context, companyID int) ([]models.Ratio, e
 	var ratios []models.Ratio
 	for rows.Next() {
 		var r models.Ratio
-		err := rows.Scan(&r.ID, &r.CompanyID, &r.Year, &r.ROE, &r.DebtEquity, &r.OPM, &r.IntrinsicValue)
+		err := rows.Scan(&r.ID, &r.CompanyID, &r.Year, &r.OPM, &r.DebtorDays, &r.InventoryDays, &r.DaysPayable, &r.CashConversionCycle, &r.WorkingCapitalDays, &r.ROCEPercent)
 		if err != nil {
 			logs.Log.Error("Failed to scan ratio row", zap.Int("company_id", companyID), zap.Error(err))
 			return nil, err
@@ -31,35 +31,95 @@ func (s *Store) GetRatios(ctx context.Context, companyID int) ([]models.Ratio, e
 	return ratios, nil
 }
 
-func (s *Store) GetFundamentals(ctx context.Context, companyID int) ([]models.Fundamental, error) {
-
+func (s *Store) GetProfitLoss(ctx context.Context, companyID int, date time.Time) ([]models.ProfitLoss, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id, company_id, year, sales, operating_profit, net_profit, eps, equity_capital, reserves, borrowings, total_assets 
-		FROM fundamentals 
-		WHERE company_id = $1 
+		SELECT id, company_id, year, COALESCE(sales, 0), COALESCE(expenses, 0), COALESCE(operating_profit, 0), COALESCE(opm_percent, 0), COALESCE(other_income, 0), COALESCE(interest, 0), COALESCE(depreciation, 0), COALESCE(profit_before_tax, 0), COALESCE(tax_percent, 0), COALESCE(net_profit, 0), COALESCE(eps, 0), COALESCE(dividend_payout, 0)
+		FROM profit_loss 
+		WHERE company_id = $1 AND EXTRACT(YEAR FROM year) <= $2
 		ORDER BY year DESC
-	`, companyID)
+	`, companyID, date.Year())
 	if err != nil {
-		logs.Log.Error("Failed to query fundamentals", zap.Int("company_id", companyID), zap.Error(err))
+		logs.Log.Error("Failed to query profit_loss", zap.Int("company_id", companyID), zap.Error(err))
 		return nil, err
 	}
 	defer rows.Close()
 
-	var fundamentals []models.Fundamental
+	var plList []models.ProfitLoss
 	for rows.Next() {
-		var f models.Fundamental
+		var p models.ProfitLoss
 		err := rows.Scan(
-			&f.ID, &f.CompanyID, &f.Year, &f.Sales, &f.OperatingProfit,
-			&f.NetProfit, &f.EPS, &f.EquityCapital, &f.Reserves,
-			&f.Borrowings, &f.TotalAssets,
+			&p.ID, &p.CompanyID, &p.Year, &p.Sales, &p.Expenses, &p.OperatingProfit, &p.OPMPercent,
+			&p.OtherIncome, &p.Interest, &p.Depreciation, &p.ProfitBeforeTax, &p.TaxPercent,
+			&p.NetProfit, &p.EPS, &p.DividendPayout,
 		)
 		if err != nil {
-			logs.Log.Error("Failed to scan fundamental row", zap.Int("company_id", companyID), zap.Error(err))
+			logs.Log.Error("Failed to scan profit_loss row", zap.Int("company_id", companyID), zap.Error(err))
 			return nil, err
 		}
-		fundamentals = append(fundamentals, f)
+		plList = append(plList, p)
 	}
-	return fundamentals, nil
+	return plList, nil
+}
+
+func (s *Store) GetBalanceSheets(ctx context.Context, companyID int, date time.Time) ([]models.BalanceSheet, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, company_id, year, COALESCE(equity_capital, 0), COALESCE(reserves, 0), COALESCE(borrowings, 0), COALESCE(other_liabilities, 0), COALESCE(total_liabilities, 0), COALESCE(fixed_assets, 0), COALESCE(cwip, 0), COALESCE(investments, 0), COALESCE(other_assets, 0), COALESCE(total_assets, 0) 
+		FROM balance_sheets 
+		WHERE company_id = $1 AND
+		EXTRACT(YEAR FROM year) <= $2
+		ORDER BY year DESC
+	`, companyID, date.Year())
+	if err != nil {
+		logs.Log.Error("Failed to query balance_sheets", zap.Int("company_id", companyID), zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
+
+	var bsList []models.BalanceSheet
+	for rows.Next() {
+		var b models.BalanceSheet
+		err := rows.Scan(
+			&b.ID, &b.CompanyID, &b.Year, &b.EquityCapital, &b.Reserves, &b.Borrowings,
+			&b.OtherLiabilities, &b.TotalLiabilities, &b.FixedAssets, &b.CWIP,
+			&b.Investments, &b.OtherAssets, &b.TotalAssets,
+		)
+		if err != nil {
+			logs.Log.Error("Failed to scan balance_sheets row", zap.Int("company_id", companyID), zap.Error(err))
+			return nil, err
+		}
+		bsList = append(bsList, b)
+	}
+	return bsList, nil
+}
+
+func (s *Store) GetCashFlows(ctx context.Context, companyID int, date time.Time) ([]models.CashFlow, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT id, company_id, year, COALESCE(cash_from_operating_activity, 0), COALESCE(cash_from_investing_activity, 0), COALESCE(cash_from_financing_activity, 0), COALESCE(net_cash_flow, 0) 
+		FROM cash_flows 
+		WHERE company_id = $1 AND
+		EXTRACT(YEAR FROM year) <= $2
+		ORDER BY year DESC
+	`, companyID, date.Year())
+	if err != nil {
+		logs.Log.Error("Failed to query cash_flows", zap.Int("company_id", companyID), zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cfList []models.CashFlow
+	for rows.Next() {
+		var c models.CashFlow
+		err := rows.Scan(
+			&c.ID, &c.CompanyID, &c.Year, &c.CashFromOperatingActivity,
+			&c.CashFromInvestingActivity, &c.CashFromFinancingActivity, &c.NetCashFlow,
+		)
+		if err != nil {
+			logs.Log.Error("Failed to scan cash_flows row", zap.Int("company_id", companyID), zap.Error(err))
+			return nil, err
+		}
+		cfList = append(cfList, c)
+	}
+	return cfList, nil
 }
 
 func (s *Store) GetStocksAtDate(ctx context.Context, date time.Time) ([]models.StockPrice, error) {
@@ -250,7 +310,53 @@ func (s *Store) GetAllCompanies(ctx context.Context) ([]models.Company, error) {
 	return companies, nil
 }
 
+func (s *Store) GetCompaniesBySector(ctx context.Context, sector string) ([]models.Company, error) {
+	rows, err := s.pool.Query(ctx, "SELECT id, symbol, name, sector, total_shares FROM companies WHERE sector = $1", sector)
+	if err != nil {
+		logs.Log.Error("Failed to query companies by sector", zap.String("sector", sector), zap.Error(err))
+		return nil, err
+	}
+	defer rows.Close()
+
+	var companies []models.Company
+	for rows.Next() {
+		var c models.Company
+		if err := rows.Scan(&c.ID, &c.Symbol, &c.Name, &c.Sector, &c.TotalShares); err != nil {
+			logs.Log.Error("Failed to scan company row by sector", zap.Error(err))
+			return nil, err
+		}
+		companies = append(companies, c)
+	}
+	return companies, nil
+}
+
+func (s *Store) GetLatestRatioForCompany(ctx context.Context, companyID int) (models.Ratio, error) {
+	var r models.Ratio
+	err := s.pool.QueryRow(ctx,
+		"SELECT id, company_id, year, COALESCE(opm, 0) FROM ratios WHERE company_id = $1 ORDER BY year DESC LIMIT 1",
+		companyID,
+	).Scan(&r.ID, &r.CompanyID, &r.Year, &r.OPM)
+	if err != nil {
+		return r, err
+	}
+	return r, nil
+}
+
+func (s *Store) GetLatestFundamentalForCompany(ctx context.Context, companyID int) (models.Fundamental, error) {
+	var f models.Fundamental
+	err := s.pool.QueryRow(ctx,
+		`SELECT id, company_id, year, COALESCE(sales, 0), COALESCE(operating_profit, 0), COALESCE(net_profit, 0), COALESCE(eps, 0), COALESCE(equity_capital, 0), COALESCE(reserves, 0), COALESCE(borrowings, 0), COALESCE(total_assets, 0)
+		 FROM fundamentals WHERE company_id = $1 ORDER BY year DESC LIMIT 1`,
+		companyID,
+	).Scan(&f.ID, &f.CompanyID, &f.Year, &f.Sales, &f.OperatingProfit, &f.NetProfit, &f.EPS, &f.EquityCapital, &f.Reserves, &f.Borrowings, &f.TotalAssets)
+	if err != nil {
+		return f, err
+	}
+	return f, nil
+}
+
 func (s *Store) GetCompanyByID(ctx context.Context, id int) (models.Company, error) {
+
 	var c models.Company
 	err := s.pool.QueryRow(ctx, "SELECT id, symbol, name, sector, total_shares FROM companies WHERE id = $1", id).Scan(&c.ID, &c.Symbol, &c.Name, &c.Sector, &c.TotalShares)
 	if err != nil {

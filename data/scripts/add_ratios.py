@@ -58,31 +58,31 @@ def load_ratios():
                 FROM STDIN WITH CSV HEADER
             """, f)
 
+        # Map folder → company via symbol column
         cur.execute("""
             INSERT INTO ratios (
-                company_id,
-                year,
-                roe,
-                debt_equity,
-                opm,
-                intrinsic_value
+                company_id, year, roe, debt_equity, opm, intrinsic_value,
+                debtor_days, inventory_days, days_payable,
+                cash_conversion_cycle, working_capital_days, roce_percent
             )
             SELECT
-                c.id,
-                r.year,
-                r.roe,
-                r.debt_equity,
-                r.opm,
-                r.intrinsic_value
+                c.id, r.year, r.roe, r.debt_equity, r.opm, r.intrinsic_value,
+                r.debtor_days, r.inventory_days, r.days_payable,
+                r.cash_conversion_cycle, r.working_capital_days, r.roce_percent
             FROM ratios_temp r
-            JOIN companies c
-              ON c.symbol = %s
+            JOIN companies c ON c.symbol = %s
             ON CONFLICT (company_id, year)
             DO UPDATE SET
                 roe = EXCLUDED.roe,
                 debt_equity = EXCLUDED.debt_equity,
                 opm = EXCLUDED.opm,
-                intrinsic_value = EXCLUDED.intrinsic_value
+                intrinsic_value = EXCLUDED.intrinsic_value,
+                debtor_days = EXCLUDED.debtor_days,
+                inventory_days = EXCLUDED.inventory_days,
+                days_payable = EXCLUDED.days_payable,
+                cash_conversion_cycle = EXCLUDED.cash_conversion_cycle,
+                working_capital_days = EXCLUDED.working_capital_days,
+                roce_percent = EXCLUDED.roce_percent
         """, (company_symbol,))
 
         cur.execute("TRUNCATE ratios_temp")

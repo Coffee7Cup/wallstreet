@@ -11,7 +11,7 @@ import (
 )
 
 func (s *Store) GetNewsByDay(ctx context.Context, date time.Time) ([]models.News, error) {
-	rows, err := s.pool.Query(ctx, "SELECT id, release_date, title, content, company_id, company_name, company_symbol FROM news WHERE release_date = $1", date)
+	rows, err := s.pool.Query(ctx, "SELECT n.id, n.release_date, n.title, n.content, n.company_id, c.name, c.symbol FROM news n JOIN companies c ON n.company_id = c.id WHERE n.release_date = $1", date)
 	if err != nil {
 		logs.Log.Error("Failed to query news", zap.Time("date", date), zap.Error(err))
 		return nil, err
@@ -40,7 +40,7 @@ func (s *Store) GetNewsByDay(ctx context.Context, date time.Time) ([]models.News
 }
 
 func (s *Store) GetNewsByDateAndCompanyId(ctx context.Context, date time.Time, companyId int) ([]models.News, error) {
-	rows, err := s.pool.Query(ctx, "SELECT id, release_date, title, content, company_id, company_name, company_symbol FROM news WHERE release_date = $1 AND company_id = $2", date, companyId)
+	rows, err := s.pool.Query(ctx, "SELECT n.id, n.release_date, n.title, n.content, n.company_id, c.name, c.symbol FROM news n JOIN companies c ON n.company_id = c.id WHERE n.release_date = $1 AND n.company_id = $2", date, companyId)
 	if err != nil {
 		logs.Log.Error("Failed to query news", zap.Time("date", date), zap.Int("company_id", companyId), zap.Error(err))
 		return nil, err
@@ -69,7 +69,7 @@ func (s *Store) GetNewsByDateAndCompanyId(ctx context.Context, date time.Time, c
 }
 
 func (s *Store) GetNewsTillDateByCompanyId(ctx context.Context, date time.Time, companyId int) ([]models.News, error) {
-	rows, err := s.pool.Query(ctx, "SELECT id, release_date, title, content, company_id, company_name, company_symbol FROM news WHERE release_date <= $1 AND company_id = $2", date, companyId)
+	rows, err := s.pool.Query(ctx, "SELECT n.id, n.release_date, n.title, n.content, n.company_id, c.name, c.symbol FROM news n JOIN companies c ON n.company_id = c.id WHERE n.release_date <= $1 AND n.company_id = $2", date, companyId)
 	if err != nil {
 		logs.Log.Error("Failed to query news", zap.Time("date", date), zap.Int("company_id", companyId), zap.Error(err))
 		return nil, err
@@ -99,7 +99,8 @@ func (s *Store) GetNewsTillDateByCompanyId(ctx context.Context, date time.Time, 
 
 func (s *Store) GetNewsSearchLimitOffsetByCompany(ctx context.Context, companyID int, date time.Time, limit int, offset int, query string) ([]models.News, error) {
 	sql := `
-		SELECT n.id, n.release_date, n.title, n.content, n.company_id, n.company_name, n.company_symbol FROM news n
+		SELECT n.id, n.release_date, n.title, n.content, n.company_id, c.name, c.symbol FROM news n
+        JOIN companies c ON n.company_id = c.id
 		WHERE n.company_id = $1 AND n.release_date <= $2
 	`
 	args := []interface{}{companyID, date}
@@ -136,8 +137,9 @@ func (s *Store) GetNewsSearchLimitOffsetByCompany(ctx context.Context, companyID
 
 func (s *Store) GetNewsAtTickForAll(ctx context.Context, tick int) ([]models.News, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT n.id, n.release_date, n.title, n.content, n.company_id, n.company_name, n.company_symbol
+		SELECT n.id, n.release_date, n.title, n.content, n.company_id, c.name, c.symbol
 		FROM news n
+        JOIN companies c ON n.company_id = c.id
 		JOIN stock_prices_with_ticks spt ON n.company_id = spt.company_id AND n.release_date = spt.date
 		WHERE spt.tick_idx = $1
 	`, tick)

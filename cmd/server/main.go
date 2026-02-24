@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/coffee7cup/wallstreet/pkg/controllers"
 	"github.com/coffee7cup/wallstreet/pkg/db"
@@ -12,6 +13,7 @@ import (
 	"github.com/coffee7cup/wallstreet/pkg/middleware"
 	"github.com/coffee7cup/wallstreet/pkg/routers"
 	"github.com/coffee7cup/wallstreet/pkg/simulation"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/coffee7cup/wallstreet/pkg/utils"
@@ -55,7 +57,16 @@ func main() {
 
 	DATABASE_URL := os.Getenv("DB_URL")
 
-	store, err := db.NewStore(DATABASE_URL)
+	// Parse configuration for pgxpool tuning
+	pgConfig, err := pgxpool.ParseConfig(DATABASE_URL)
+	if err != nil {
+		logs.Log.Fatal("Failed to parse database URL", zap.Error(err))
+	}
+	pgConfig.MaxConns = 150 // Handle high concurrency
+	pgConfig.MinConns = 20
+	pgConfig.MaxConnIdleTime = 5 * time.Minute
+
+	store, err := db.NewStoreWithConfig(pgConfig)
 	if err != nil {
 		logs.Log.Fatal("Failed to connect to database", zap.Error(err))
 	}
