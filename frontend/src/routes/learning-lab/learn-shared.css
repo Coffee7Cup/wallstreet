@@ -1,0 +1,138 @@
+/* Shared styles for Learning Lab modules */
+.page {
+	animation: fadeIn 0.5s ease-out;
+}
+
+.page-header {
+	margin-bottom: 2.5rem;
+}
+
+.page-tag {
+	display: inline-block;
+	font-size: 0.65rem;
+	font-weight: 800;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	padding: 0.25rem 0.7rem;
+	border-radius: 999px;
+	margin-bottom: 1rem;
+}
+
+.page-header h1 {
+	font-size: clamp(2.25rem, 5vw, 3.5rem);
+	font-weight: 900;
+	line-height: 1.1;
+	margin-bottom: 1.25rem;
+	letter-spacing: -0.03em;
+}
+
+.page-lead {
+	font-size: 1.25rem;
+	opacity: 0.7;
+	line-height: 1.6;
+	max-width: 750px;
+}
+
+.section {
+	margin-bottom: 3rem;
+}
+
+.section h2 {
+	font-size: 1.5rem;
+	font-weight: 800;
+	margin-bottom: 1.25rem;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.section-intro {
+	font-size: 1.1rem;
+	opacity: 0.8;
+	line-height: 1.6;
+	margin-bottom: 2rem;
+	max-width: 800px;
+}
+
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Visualization helpers */
+.visual-box {
+	background: var(--bg-hover);
+	border: 1px solid var(--border-color);
+	border-radius: 16px;
+	padding: 1.5rem;
+	margin: 1.5rem 0;
+}
+
+.market-cycle-viz {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 2rem 1rem;
+	position: relative;
+}
+
+.cycle-step {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.75rem;
+	width: 120px;
+	text-align: center;
+	z-index: 1;
+}
+
+.step-icon {
+	width: 48px;
+	height: 48px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--bg-primary);
+	border: 2px solid var(--border-color);
+	transition: all 0.3s;
+}
+
+.cycle-step:hover .step-icon {
+	transform: scale(1.1);
+	border-color: var(--step-color);
+	box-shadow: 0 0 15px color-mix(in srgb, var(--step-color) 30%, transparent);
+}
+
+.step-label {
+	font-size: 0.75rem;
+	font-weight: 700;
+}
+
+.cycle-arrow {
+	flex: 1;
+	height: 2px;
+	background: var(--border-color);
+	margin: 0 -10px;
+	position: relative;
+	top: -15px;
+}
+
+.cycle-arrow::after {
+	content: '';
+	position: absolute;
+	right: 0;
+	top: -3px;
+	width: 8px;
+	height: 8px;
+	border-top: 2px solid var(--border-color);
+	border-right: 2px solid var(--border-color);
+	transform: rotate(45deg);
+}
