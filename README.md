@@ -15,7 +15,7 @@ This project is a monorepo consisting of:
 
 - Go 1.25.5
 - Node.js 24.10.0
-- PostgreSQL 16
+- PostgreSQL 18
 - python 
 
 ### SetUp
@@ -25,18 +25,16 @@ This project is a monorepo consisting of:
 ```bash
 pip install psycopg2
 pip install python-dotenv
+pip install pandas
 ```
 
-2. Run the /backend/data/scripts/init.sql ot copy paste it
+2. Run the /backend/data/scripts/init.sql to copy paste it
 
 3. Run the following commands to populate the database
 ```bash
-cd backend/data/scripts
-python add_fundamentals.py
-python add_ratios.py
-python add_stocks.py
-python add_users_admins.py
-
+cd backend/_data/scripts
+npm scrape.mjs
+py import_data.py
 ```
 
 ### Database
