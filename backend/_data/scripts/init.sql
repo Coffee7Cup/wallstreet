@@ -1,4 +1,4 @@
--- Initial Schema for WallStreet project
+-- Initial Schema for WallStreet project (Updated with CASCADE)
 
 -- 1. Users table
 CREATE TABLE IF NOT EXISTS users (
@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS companies (
 -- 4. Stock Prices table
 CREATE TABLE IF NOT EXISTS stock_prices (
     id SERIAL PRIMARY KEY,
-    company_id INT NOT NULL REFERENCES companies(id),
+    -- Cascades if a company is deleted or its ID changes
+    company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE ON UPDATE CASCADE,
     date DATE NOT NULL,
     open_price NUMERIC(15, 2) NOT NULL,
     close_price NUMERIC(15, 2) NOT NULL,
@@ -49,7 +50,7 @@ CREATE INDEX IF NOT EXISTS idx_stock_prices_company_date ON stock_prices(company
 -- 5. Ratios table
 CREATE TABLE IF NOT EXISTS ratios (
     id SERIAL PRIMARY KEY,
-    company_id INT NOT NULL REFERENCES companies(id),
+    company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE ON UPDATE CASCADE,
     year DATE NOT NULL,
     roe NUMERIC,
     debt_equity NUMERIC,
@@ -64,10 +65,10 @@ CREATE TABLE IF NOT EXISTS ratios (
     UNIQUE(company_id, year)
 );
 
--- 6. Profit & Loss table (replaces fundamentals)
+-- 6. Profit & Loss table
 CREATE TABLE IF NOT EXISTS profit_loss (
     id SERIAL PRIMARY KEY,
-    company_id INT NOT NULL REFERENCES companies(id),
+    company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE ON UPDATE CASCADE,
     year DATE NOT NULL,
     sales NUMERIC(15, 2),
     expenses NUMERIC(15, 2),
@@ -87,7 +88,7 @@ CREATE TABLE IF NOT EXISTS profit_loss (
 -- 6a. Balance Sheets table
 CREATE TABLE IF NOT EXISTS balance_sheets (
     id SERIAL PRIMARY KEY,
-    company_id INT NOT NULL REFERENCES companies(id),
+    company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE ON UPDATE CASCADE,
     year DATE NOT NULL,
     equity_capital NUMERIC(15, 2),
     reserves NUMERIC(15, 2),
@@ -105,7 +106,7 @@ CREATE TABLE IF NOT EXISTS balance_sheets (
 -- 6b. Cash Flows table
 CREATE TABLE IF NOT EXISTS cash_flows (
     id SERIAL PRIMARY KEY,
-    company_id INT NOT NULL REFERENCES companies(id),
+    company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE ON UPDATE CASCADE,
     year DATE NOT NULL,
     cash_from_operating_activity NUMERIC(15, 2),
     cash_from_investing_activity NUMERIC(15, 2),
@@ -117,8 +118,9 @@ CREATE TABLE IF NOT EXISTS cash_flows (
 -- 7. Trades table
 CREATE TABLE IF NOT EXISTS trades (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id),
-    company_id INT NOT NULL REFERENCES companies(id),
+    -- If a user or company is deleted, their trade history is cleared
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE ON UPDATE CASCADE,
     trade_type VARCHAR(10) NOT NULL, -- 'BUY' or 'SELL'
     quantity INT NOT NULL,
     price NUMERIC(15, 2) NOT NULL DEFAULT 0,
@@ -131,8 +133,8 @@ CREATE INDEX IF NOT EXISTS idx_trades_timestamp ON trades(timestamp DESC);
 
 -- 8. Portfolio Entries table
 CREATE TABLE IF NOT EXISTS portfolio_entries (
-    user_id INT NOT NULL REFERENCES users(id),
-    company_id INT NOT NULL REFERENCES companies(id),
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE ON UPDATE CASCADE,
     quantity INT NOT NULL DEFAULT 0,
     PRIMARY KEY(user_id, company_id),
     CONSTRAINT positive_quantity CHECK (quantity >= 0)
@@ -144,7 +146,7 @@ CREATE TABLE IF NOT EXISTS news (
     release_date DATE NOT NULL,
     title VARCHAR(255) NOT NULL,
     content TEXT,
-    company_id INT NOT NULL REFERENCES companies(id)
+    company_id INT NOT NULL REFERENCES companies(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_news_date ON news(release_date);
@@ -160,7 +162,7 @@ CREATE TABLE IF NOT EXISTS simulation_state (
     CONSTRAINT one_row CHECK (id = 1)
 );
 
--- Compatibility views (optional but helpful)
+-- Compatibility views
 CREATE OR REPLACE VIEW prices AS SELECT * FROM stock_prices;
 CREATE OR REPLACE VIEW trade AS SELECT * FROM trades;
 CREATE OR REPLACE VIEW portfolio AS SELECT * FROM portfolio_entries;
@@ -177,68 +179,32 @@ SELECT n.*,
        COALESCE(n.tick, (n.release_date - s.start_date)) as tick_idx
 FROM news n, sim_start s;
 
--- Staging tables for scripts (must be regular tables to use with COPY in some drivers)
+-- Staging tables (No foreign keys here, so no cascade needed)
 CREATE TABLE IF NOT EXISTS prices_temp (
-    date DATE,
-    open_price NUMERIC,
-    close_price NUMERIC,
-    low_price NUMERIC,
-    high_price NUMERIC,
-    no_of_shares BIGINT,
-    no_of_trades INT,
-    total_turnover NUMERIC
+    date DATE, open_price NUMERIC, close_price NUMERIC, low_price NUMERIC, 
+    high_price NUMERIC, no_of_shares BIGINT, no_of_trades INT, total_turnover NUMERIC
 );
 
 CREATE TABLE IF NOT EXISTS ratios_temp (
-    year DATE,
-    roe NUMERIC,
-    debt_equity NUMERIC,
-    opm NUMERIC,
-    intrinsic_value NUMERIC,
-    debtor_days INT,
-    inventory_days INT,
-    days_payable INT,
-    cash_conversion_cycle INT,
-    working_capital_days INT,
-    roce_percent NUMERIC
+    year DATE, roe NUMERIC, debt_equity NUMERIC, opm NUMERIC, intrinsic_value NUMERIC, 
+    debtor_days INT, inventory_days INT, days_payable INT, cash_conversion_cycle INT, 
+    working_capital_days INT, roce_percent NUMERIC
 );
 
 CREATE TABLE IF NOT EXISTS profit_loss_temp (
-    year DATE,
-    sales NUMERIC,
-    expenses NUMERIC,
-    operating_profit NUMERIC,
-    opm_percent NUMERIC,
-    other_income NUMERIC,
-    interest NUMERIC,
-    depreciation NUMERIC,
-    profit_before_tax NUMERIC,
-    tax_percent NUMERIC,
-    net_profit NUMERIC,
-    eps NUMERIC,
-    dividend_payout NUMERIC
+    year DATE, sales NUMERIC, expenses NUMERIC, operating_profit NUMERIC, opm_percent NUMERIC, 
+    other_income NUMERIC, interest NUMERIC, depreciation NUMERIC, profit_before_tax NUMERIC, 
+    tax_percent NUMERIC, net_profit NUMERIC, eps NUMERIC, dividend_payout NUMERIC
 );
 
 CREATE TABLE IF NOT EXISTS balance_sheets_temp (
-    year DATE,
-    equity_capital NUMERIC,
-    reserves NUMERIC,
-    borrowings NUMERIC,
-    other_liabilities NUMERIC,
-    total_liabilities NUMERIC,
-    fixed_assets NUMERIC,
-    cwip NUMERIC,
-    investments NUMERIC,
-    other_assets NUMERIC,
-    total_assets NUMERIC
+    year DATE, equity_capital NUMERIC, reserves NUMERIC, borrowings NUMERIC, other_liabilities NUMERIC, 
+    total_liabilities NUMERIC, fixed_assets NUMERIC, cwip NUMERIC, investments NUMERIC, other_assets NUMERIC, total_assets NUMERIC
 );
 
 CREATE TABLE IF NOT EXISTS cash_flows_temp (
-    year DATE,
-    cash_from_operating_activity NUMERIC,
-    cash_from_investing_activity NUMERIC,
-    cash_from_financing_activity NUMERIC,
-    net_cash_flow NUMERIC
+    year DATE, cash_from_operating_activity NUMERIC, cash_from_investing_activity NUMERIC, 
+    cash_from_financing_activity NUMERIC, net_cash_flow NUMERIC
 );
 
 -- Seed basic company data
@@ -248,4 +214,4 @@ INSERT INTO companies (symbol, name, sector, total_shares) VALUES
 ('ITC', 'ITC Limited', 'FMCG', 1000000000),
 ('RELIANCE', 'Reliance Industries', 'CONGLOMERATE', 1000000000),
 ('TCS', 'Tata Consultancy Services', 'IT', 1000000000)
-ON CONFLICT (symbol) DO NOTHING;
+ON CONFLICT (symbol) DO NOTHING;N CONFLICT (symbol) DO NOTHING;
