@@ -16,26 +16,15 @@ This project is a monorepo consisting of:
 - Go 1.25.5
 - Node.js 24.10.0
 - PostgreSQL 18
-- python 
+- python
 
 ### SetUp
-1. You can use the sample data already give or collect data by yourself and put it in the /backend/data/company-data folder - each folder can have fundamentals.csv, prices.csv, ratios.csv, news.csv
 
-#### You need the following packeges installed in your python
-```bash
-pip install psycopg2
-pip install python-dotenv
-pip install pandas
-```
+1. You can use the sample data already give or collect data by yourself and put it in the /backend/data/company-data folder - each folder can have fundamentals.csv, prices.csv, ratios.csv
 
-2. Run the /backend/data/scripts/init.sql to copy paste it
+2. Add new.csv in \_data folder
 
-3. Run the following commands to populate the database
-```bash
-cd backend/_data/scripts
-npm scrape.mjs
-py import_data.py
-```
+3. remember to login into your PostgreSQL server in CLI and do the below
 
 ### Database
 
@@ -50,17 +39,45 @@ CREATE DATABASE wallstreet;
 
 ```
 
+#### You need the following packeges installed in your python
+
+```bash
+pip install psycopg2
+pip install python-dotenv
+pip install pandas
+```
+
+1. Run the /backend/data/scripts/init.sql to copy paste it
+
+2. Run the following commands to populate the database
+
+```bash
+cd backend/_data/scripts
+py import_data.py
+```
+
+1. If you don't have data consider
+
+```bash
+npm scrape.mjs
+```
+
 ### Backend
 
 1. Navigate to the `backend` directory:
+
    ```bash
    cd backend
    ```
+
 2. Copy the sample environment file and configure your database:
+
    ```bash
    cp .env.sample .env
    ```
+
 3. Run the backend server:
+
    ```bash
    go run cmd/server/main.go
    ```
@@ -68,17 +85,23 @@ CREATE DATABASE wallstreet;
 ### Frontend
 
 1. Navigate to the `frontend` directory:
+
    ```bash
    cd frontend
    ```
+
 2. Install dependencies:
+
    ```bash
    npm install
    ```
+
 3. Run the development server:
+
    ```bash
    npm run dev
    ```
+
 4. Open your browser to `http://localhost:5173`.
 
 ## Features
@@ -88,3 +111,17 @@ CREATE DATABASE wallstreet;
 - Detailed company fundamentals and performance ratios.
 - Responsive dashboard with price history graphs.
 - Structured logging for system monitoring.
+
+## To run in the LAN - through wifi or ethernet
+
+1. Get you ip adderss <ip_addr>, change the PUBLIC_HOST in ./frontend/src/lib/constants.js.
+
+2. In dev mode launch the frontend using.
+
+```bash
+npm run dev --host
+```
+
+1. If not in dev mode the frontend will open at the ip <ip_addr>/2000, 2000 is the default port i have set. Here are your setting the PUBLIC_HOST to access the backend, so while launching in network even in dev mode set the PUBLIC_HOST
+
+2. Now you can access the app in <ip_addr>/2000.
