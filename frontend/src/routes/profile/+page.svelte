@@ -3,11 +3,10 @@
 	import api from '$lib/api';
 	import { user } from '$lib/stores/auth';
 	import { marketState } from '$lib/stores/market';
-	import { Wallet, Briefcase, TrendingUp, User as UserIcon, Calendar } from 'lucide-svelte';
+	import { Wallet, Briefcase, User as UserIcon, Calendar } from 'lucide-svelte';
 	import gsap from 'gsap';
 
 	let portfolio = $derived($marketState.userPortfolio || []);
-	let trades = $state([]);
 	let loading = $state(true);
 
 	// Calculate portfolio value reactively using real-time prices and holdings from marketState
@@ -20,20 +19,13 @@
 		}, 0);
 	});
 
-	let stats = $state({
-		totalTrades: 0,
-		profitableTrades: 0,
-		totalProfit: 0
-	});
-
 	onMount(async () => {
 		if (!$user) return;
 
 		try {
-			const [profileRes, portRes, tradesRes] = await Promise.all([
+			const [profileRes, portRes] = await Promise.all([
 				api.get('/users/profile'),
-				api.get('/trade/portfolio'),
-				api.get('/trade/trades', { params: { limit: 5 } })
+				api.get('/trade/portfolio')
 			]);
 
 			user.update((u) => ({ ...u, ...profileRes.data.user }));
@@ -44,9 +36,6 @@
 				userPortfolio: portRes.data.portfolio || [],
 				userBalance: profileRes.data.user.cash_balance
 			}));
-
-			trades = tradesRes.data.trades || [];
-			stats.totalTrades = tradesRes.data.total_count || trades.length;
 
 			loading = false;
 
@@ -122,66 +111,6 @@
 
 	<!-- Main Content -->
 	<div class="space-y-8 lg:col-span-2">
-		<!-- Stats Grid -->
-		<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-			<div class="stat-card notion-card bg-(--bg-primary) p-6">
-				<p class="mb-1 text-[10px] font-black tracking-widest uppercase opacity-40">Total Trades</p>
-				<p class="text-3xl font-black">{stats.totalTrades}</p>
-			</div>
-		</div>
-
-		<!-- Recent Activity -->
-		<div class="notion-card bg-(--bg-primary) p-6">
-			<h3 class="mb-6 flex items-center gap-2 text-lg font-bold">
-				<TrendingUp size={20} class="text-[#27AE60]" /> Recent Activity
-			</h3>
-
-			{#if loading}
-				<div class="space-y-4">
-					{#each Array(3) as _}
-						<div class="h-16 animate-pulse rounded-xl bg-(--bg-hover)/20"></div>
-					{/each}
-				</div>
-			{:else if trades.length === 0}
-				<p class="py-8 text-center opacity-40">No recent trades found.</p>
-			{:else}
-				<div class="space-y-4">
-					{#each trades as trade}
-						<div
-							class="flex items-center justify-between border-b border-(--border-color)/50 pb-4 last:border-0 last:pb-0"
-						>
-							<div class="flex items-center gap-4">
-								<div
-									class={`rounded-full p-2 ${trade.trade_type === 'BUY' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}
-								>
-									<TrendingUp size={16} class={trade.trade_type === 'SELL' ? 'rotate-180' : ''} />
-								</div>
-								<div>
-									<p class="font-bold">
-										{trade.company_name}
-										<span class="text-xs opacity-40">({trade.company_symbol})</span>
-									</p>
-									<p class="text-xs opacity-50">{new Date(trade.date).toLocaleDateString()}</p>
-								</div>
-							</div>
-							<div class="text-right">
-								<p class="font-bold">
-									{trade.trade_type}
-									{trade.quantity} @ ₹{trade.price.toFixed(2)}
-								</p>
-								<p class="text-xs opacity-40">₹{(trade.quantity * trade.price).toLocaleString()}</p>
-							</div>
-						</div>
-					{/each}
-				</div>
-				<a
-					href="/trades"
-					class="mt-6 block text-center text-sm font-bold text-[#27AE60] hover:underline"
-					>View All Trades</a
-				>
-			{/if}
-		</div>
-
 		<!-- Portfolio List -->
 		<div>
 			<h3 class="mb-4 flex items-center gap-2 text-lg font-bold">
