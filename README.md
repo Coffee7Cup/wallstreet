@@ -1,6 +1,17 @@
 # WallStreet Simulation
 
-A real-time stock market simulation with a Go backend and a SvelteKit frontend.
+## Introduction
+
+A stock market simulation that take past years data and lets people trade using fake/vertual money. The data should be collected and stored in the backend/\_data folder and follow the instructions.
+
+## DEMO
+
+|           Column 1           |           Column 2           |
+| :--------------------------: | :--------------------------: |
+| ![Window 0](demos/w-[0].png) | ![Window 1](demos/w-[1].png) |
+| ![Window 2](demos/w-[2].png) | ![Window 3](demos/w-[3].png) |
+| ![Window 4](demos/w-[4].png) | ![Window 5](demos/w-[5].png) |
+| ![Window 6](demos/w-[6].png) | ![Window 7](demos/w-[7].png) |
 
 ## Project Structure
 
@@ -14,13 +25,13 @@ This project is a monorepo consisting of:
 ### Prerequisites
 
 - Go 1.25.5
-- Node.js 24.10.0
+- Node.js 24.10.0 (or any JS runtime - i use Bun)
 - PostgreSQL 18
 - python
 
 ### SetUp
 
-1. You can use the sample data already give or collect data by yourself and put it in the /backend/data/company-data folder - each folder can have fundamentals.csv, prices.csv, ratios.csv
+1. You can use the sample data already give or collect data by yourself and put it in the /backend/\_data/{company_name} folder - each folder can have fundamentals.csv, prices.csv, ratios.csv, the `backend/scripts/import_data.py` so see that.
 
 2. Add new.csv in \_data folder
 
@@ -106,9 +117,9 @@ npm scrape.mjs
 
 ## Features
 
-- Real-time stock price updates via WebSockets.
+- Fast stock price updates via WebSockets.
 - Admin panel for simulation control (Start, Stop, Pause, Resume).
-- Detailed company fundamentals and performance ratios.
+- Company fundamentals and performance ratios.
 - Responsive dashboard with price history graphs.
 - Structured logging for system monitoring.
 
@@ -124,4 +135,6 @@ npm run dev --host
 
 1. If not in dev mode the frontend will open at the ip <ip_addr>/2000, 2000 is the default port i have set. Here are your setting the PUBLIC_HOST to access the backend, so while launching in network even in dev mode set the PUBLIC_HOST
 
-2. Now you can access the app in <ip_addr>/2000.
+2. Now you can access the app in <ip_addr>.
+
+3. You can change these in frontend/.env.
