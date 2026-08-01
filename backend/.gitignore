@@ -2,10 +2,11 @@
 
 .env
 
-logs/
+/logs/
+/private/
 
 *.exe
 
 __*
 
-./_data/user_data.csv
+/_data/user_data.csv
