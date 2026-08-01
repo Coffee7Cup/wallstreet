@@ -163,6 +163,12 @@
 			const profileRes = await api.get('/users/profile');
 			userData.balance = profileRes.data.user.cash_balance;
 
+			marketState.update((s) => ({
+				...s,
+				userPortfolio: portRes.data.portfolio || [],
+				userBalance: profileRes.data.user.cash_balance
+			}));
+
 			loading = false;
 			console.log('Data loaded, initializing chart and animations');
 
@@ -237,9 +243,13 @@
 
 	// Reactively update userData when marketState updates
 	$effect(() => {
-		userData.balance = $marketState.userBalance;
-		const portfolioItem = $marketState.userPortfolio?.find((p) => p.company_id == companyId);
-		userData.owned = portfolioItem?.quantity || 0;
+		if ($marketState.userBalance !== undefined && $marketState.userBalance !== null) {
+			userData.balance = $marketState.userBalance;
+		}
+		if ($marketState.userPortfolio && Array.isArray($marketState.userPortfolio)) {
+			const portfolioItem = $marketState.userPortfolio.find((p) => p.company_id == companyId);
+			userData.owned = portfolioItem?.quantity || 0;
+		}
 	});
 
 	async function handleTrade(type) {
@@ -258,7 +268,24 @@
 			// Optimistic success message
 			tradeSuccess = `${type} order for ${quantity} shares placed.`;
 
-			// No need for setTimeout refill here anymore as marketState updates via WS
+			// Refresh portfolio & balance from API as well to guarantee immediate UI update
+			setTimeout(async () => {
+				try {
+					const [portRes, profileRes] = await Promise.all([
+						api.get('/trade/portfolio'),
+						api.get('/users/profile')
+					]);
+					if (portRes.data.portfolio && profileRes.data.user) {
+						marketState.update((s) => ({
+							...s,
+							userPortfolio: portRes.data.portfolio,
+							userBalance: profileRes.data.user.cash_balance
+						}));
+					}
+				} catch (e) {
+					console.error('Error refreshing portfolio after trade', e);
+				}
+			}, 300);
 
 			// Clear success message after 3s
 			setTimeout(() => {

@@ -3,3 +3,7 @@ TODO.txt
 backup.zip
 visualize_prices.ipynb
 demos/
+user_data.csv
+use_data.csv
+backend/_data/user_data.csv
+
