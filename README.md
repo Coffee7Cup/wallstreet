@@ -67,7 +67,7 @@ cd backend/_data/scripts
 py import_data.py
 ```
 
-1. If you don't have data consider
+1. If you don't have data consider - i have the data in this dir - so the below is not needed
 
 ```bash
 npm scrape.mjs
