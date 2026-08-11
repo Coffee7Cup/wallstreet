@@ -121,7 +121,7 @@
 				<a
 					href="https://coffee7cup.github.io/cie-1/"
 					target="_blank"
-					class="text-xl font-bold tracking-tight">WallStreet - CIE</a
+					class="text-xl font-bold tracking-tight">WallStreet - Sjcknl</a
 				>
 				<div class="hidden items-center gap-4 md:flex">
 					{#if $user || $admin}
