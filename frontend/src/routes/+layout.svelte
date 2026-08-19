@@ -121,7 +121,7 @@
 				<a
 					href="https://coffee7cup.github.io/cie-1/"
 					target="_blank"
-					class="text-xl font-bold tracking-tight">WallStreet - Sjcknl</a
+					class="text-xl font-bold tracking-tight">WallStreet</a
 				>
 				<div class="hidden items-center gap-4 md:flex">
 					{#if $user || $admin}
@@ -318,32 +318,32 @@
 	</main>
 
 	<!-- Connection Status Indicator -->
-	<div class="fixed right-6 bottom-6 z-50 flex flex-col items-end gap-2">
-		<div
-			class="flex items-center gap-2 rounded-full border border-(--border-color) bg-(--bg-primary)/80 px-3 py-1 text-[10px] font-black tracking-widest uppercase shadow-xl backdrop-blur-md"
-			class:text-green-500={$marketState.connectionStatus === 'connected'}
-			class:text-yellow-500={$marketState.connectionStatus === 'connecting' ||
-				$marketState.connectionStatus === 'reconnecting'}
-			class:text-red-500={$marketState.connectionStatus === 'disconnected'}
-		>
-			<span class="relative flex h-2 w-2">
-				{#if $marketState.connectionStatus === 'connected'}
-					<span
-						class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"
-					></span>
-					<span class="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
-				{:else if $marketState.connectionStatus === 'disconnected'}
-					<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span>
-				{:else}
-					<span
-						class="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-75"
-					></span>
-					<span class="relative inline-flex h-2 w-2 rounded-full bg-yellow-500"></span>
-				{/if}
-			</span>
-			{$marketState.connectionStatus}
-		</div>
-	</div>
+	<!-- <div class="fixed right-6 bottom-6 z-50 flex flex-col items-end gap-2"> -->
+	<!-- 	<div -->
+	<!-- 		class="flex items-center gap-2 rounded-full border border-(--border-color) bg-(--bg-primary)/80 px-3 py-1 text-[10px] font-black tracking-widest uppercase shadow-xl backdrop-blur-md" -->
+	<!-- 		class:text-green-500={$marketState.connectionStatus === 'connected'} -->
+	<!-- 		class:text-yellow-500={$marketState.connectionStatus === 'connecting' || -->
+	<!-- 			$marketState.connectionStatus === 'reconnecting'} -->
+	<!-- 		class:text-red-500={$marketState.connectionStatus === 'disconnected'} -->
+	<!-- 	> -->
+	<!-- 		<span class="relative flex h-2 w-2"> -->
+	<!-- 			{#if $marketState.connectionStatus === 'connected'} -->
+	<!-- 				<span -->
+	<!-- 					class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" -->
+	<!-- 				></span> -->
+	<!-- 				<span class="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span> -->
+	<!-- 			{:else if $marketState.connectionStatus === 'disconnected'} -->
+	<!-- 				<span class="relative inline-flex h-2 w-2 rounded-full bg-red-500"></span> -->
+	<!-- 			{:else} -->
+	<!-- 				<span -->
+	<!-- 					class="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-75" -->
+	<!-- 				></span> -->
+	<!-- 				<span class="relative inline-flex h-2 w-2 rounded-full bg-yellow-500"></span> -->
+	<!-- 			{/if} -->
+	<!-- 		</span> -->
+	<!-- 		{$marketState.connectionStatus} -->
+	<!-- 	</div> -->
+	<!-- </div> -->
 
 	{#if $marketState.simulationEnded}
 		<div

@@ -45,7 +45,6 @@
 		error = '';
 		loading = true;
 		try {
-
 			const endpoint = isAdmin ? '/admin/login' : '/users/login';
 			const response = await api.post(endpoint, {
 				username: username,

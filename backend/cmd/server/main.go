@@ -58,12 +58,11 @@ func main() {
 	DATABASE_URL := os.Getenv("DB_URL")
 	PORT := os.Getenv("PORT")
 
-	// Parse configuration for pgxpool tuning
 	pgConfig, err := pgxpool.ParseConfig(DATABASE_URL)
 	if err != nil {
 		logs.Log.Fatal("Failed to parse database URL", zap.Error(err))
 	}
-	pgConfig.MaxConns = 25 // Stay within Postgres's default max_connections (100)
+	pgConfig.MaxConns = 25
 	pgConfig.MinConns = 5
 	pgConfig.MaxConnIdleTime = 5 * time.Minute
 
