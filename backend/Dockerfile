@@ -1,4 +1,4 @@
-FROM go:1.25.5-alpine 
+FROM go:1.25.5-alpine AS builder
 
 WORKDIR /app
 
@@ -17,7 +17,5 @@ WORKDIR /app
 
 # Copy compiled binary from builder stage
 COPY --from=builder /app/main .
-
-EXPOSE 8080
 
 CMD ["./main"]
